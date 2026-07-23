@@ -1,0 +1,29 @@
+{
+  "name": "navastar",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Navastar Logistics — AI-powered, multi-commodity transport & logistics operating system and licensed property broker.",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.7.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "db:generate": "pnpm --filter @navastar/db generate",
+    "db:migrate": "pnpm --filter @navastar/db migrate",
+    "db:push": "pnpm --filter @navastar/db push",
+    "db:seed": "pnpm --filter @navastar/db seed",
+    "db:studio": "pnpm --filter @navastar/db studio",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.9",
+    "typescript": "^5.5.4",
+    "tsx": "^4.16.2"
+  }
+}

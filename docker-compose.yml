@@ -1,0 +1,59 @@
+# Local development infrastructure: Postgres + MinIO.
+# Usage:  docker compose up -d      (then `pnpm dev`)
+# The application (web + api) runs on the host in dev; see docker-compose.prod.yml
+# for the full self-hosted Hetzner stack (added in the deployment phase).
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: navastar-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-navastar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-navastar}
+      POSTGRES_DB: ${POSTGRES_DB:-navastar}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - navastar_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-navastar} -d ${POSTGRES_DB:-navastar}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: navastar-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-navastar}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-navastar-secret}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # web console
+    volumes:
+      - navastar_miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: create the media bucket so the app doesn't have to on boot.
+  minio-setup:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${S3_ACCESS_KEY:-navastar} ${S3_SECRET_KEY:-navastar-secret} &&
+      mc mb --ignore-existing local/${S3_BUCKET:-navastar-media} &&
+      mc anonymous set download local/${S3_BUCKET:-navastar-media} &&
+      echo 'bucket ready';
+      "
+
+volumes:
+  navastar_pgdata:
+  navastar_miniodata:

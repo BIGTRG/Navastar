@@ -1,0 +1,802 @@
+// Navastar Logistics — Prisma schema (full data model per master brief).
+// Postgres. Generated client is re-exported from @navastar/db.
+//
+// Conventions:
+//  - cuid() ids everywhere.
+//  - Money stored as integer minor units (cents) to avoid float drift; field names
+//    end in `Cents`. Percentages stored as basis points (`Bps`, 1% = 100).
+//  - CustodyEvent is append-only + hash-chained (see @navastar/db hash-chain helper).
+//  - Every AI output writes an AIDecision row (human-in-the-loop + QA hook).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  customer
+  independent_carrier
+  employee_driver
+  lease_operator
+  dispatcher
+  qa_reviewer
+  admin
+  auction_partner
+  equipment_lessor
+}
+
+enum CommodityType {
+  VEHICLE
+  BOAT
+  EQUIPMENT
+  FREIGHT
+  WHITE_GLOVE
+  HIGH_VALUE
+  LIVE_ANIMALS
+}
+
+enum ShipmentStatus {
+  DRAFT
+  QUOTED
+  BOOKED
+  ASSIGNED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  EXCEPTION
+  CANCELLED
+  COMPLETED
+}
+
+enum LegStatus {
+  PLANNED
+  ASSIGNED
+  EN_ROUTE_PICKUP
+  AT_PICKUP
+  LOADED
+  EN_ROUTE_DROPOFF
+  AT_DROPOFF
+  DELIVERED
+  EXCEPTION
+}
+
+enum PartyRole {
+  BUYER
+  SELLER
+  SHIPPER
+  CONSIGNEE
+  PICKUP_CONTACT
+  DROPOFF_CONTACT
+}
+
+enum CarrierKind {
+  INTERNAL_FLEET
+  INDEPENDENT
+}
+
+enum DriverType {
+  EMPLOYEE_W2
+  INDEPENDENT
+  LEASE_ON
+}
+
+enum AssetType {
+  TRUCK
+  TRAILER
+  CAR_HAULER
+  FLATBED
+  ENCLOSED
+  OTHER
+}
+
+enum QuoteStatus {
+  ACTIVE
+  EXPIRED
+  ACCEPTED
+  DECLINED
+}
+
+enum CustodyEventType {
+  CREATED
+  QUOTED
+  BOOKED
+  ASSIGNED
+  PICKUP_ARRIVED
+  INSPECTED_PICKUP
+  LOADED
+  IN_TRANSIT
+  DROPOFF_ARRIVED
+  INSPECTED_DROPOFF
+  POD_SIGNED
+  DELIVERED
+  EXCEPTION
+  HANDOFF
+}
+
+enum DocumentType {
+  BOL
+  POD
+  TITLE
+  INSPECTION_PHOTO
+  INSPECTION_VIDEO
+  SIGNATURE
+  VIN_PHOTO
+  ODOMETER_PHOTO
+  INSURANCE_CERT
+  OTHER
+}
+
+enum InspectionType {
+  PICKUP
+  DROPOFF
+  INTERIM
+}
+
+enum FindingSeverity {
+  INFO
+  MINOR
+  MODERATE
+  MAJOR
+  CRITICAL
+}
+
+enum AIDecisionKind {
+  PRICING
+  MATCHING
+  INSPECTION
+  ETA
+  DOCUMENT_OCR
+  CARRIER_LOOKUP
+  SUPPORT_COPILOT
+  FRAUD_RISK
+}
+
+enum DecidedBy {
+  ai
+  human
+}
+
+enum QAStatus {
+  pending
+  pass
+  fix
+  fail
+}
+
+enum PaymentDirection {
+  INBOUND // customer -> Navastar
+  PAYOUT // Navastar -> carrier/driver
+}
+
+enum PaymentMethod {
+  CARD
+  ACH
+  ESCROW
+  QUICK_PAY
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  SETTLED
+  FAILED
+  REFUNDED
+}
+
+enum EscrowState {
+  FEE_COLLECTED
+  FUNDS_HELD
+  BOL_SIGNED
+  RELEASED
+  PAID
+}
+
+enum AuctionPartnerCode {
+  BIDNOW
+  AUCTORA
+  AUCTION_OF_AMERICA
+  COPART
+  IAA
+  MANHEIM
+  ADESA
+}
+
+enum InsuranceType {
+  CARGO
+  LIABILITY
+  PHYSICAL_DAMAGE
+}
+
+enum ClaimStatus {
+  OPEN
+  INVESTIGATING
+  APPROVED
+  DENIED
+  PAID
+  CLOSED
+}
+
+enum LeaseStatus {
+  LISTED
+  RESERVED
+  ACTIVE
+  ENDED
+  CANCELLED
+}
+
+// ─────────────────────────────────────────────────────────────
+// Identity & RBAC
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  phone        String?
+  roles        Role[]   @default([customer])
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // relations
+  parties       Party[]
+  driver        Driver?
+  approvals     AIDecision[] @relation("AIApprovedBy")
+  qaReviews     QAReview[]   @relation("QAReviewer")
+  ratingsGiven  Rating[]     @relation("RatingAuthor")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Commercial entities
+// ─────────────────────────────────────────────────────────────
+
+// A commodity toggle + margin config lever (Revenue admin backboard, Phase 3).
+model Commodity {
+  id         String        @id @default(cuid())
+  type       CommodityType @unique
+  label      String
+  enabled    Boolean       @default(true) // Live Animals ships OFF; flip ON when ready
+  marginBps  Int           @default(1500) // 15% default margin per commodity
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  shipments Shipment[]
+}
+
+model Party {
+  id        String    @id @default(cuid())
+  role      PartyRole
+  name      String
+  company   String?
+  email     String?
+  phone     String?
+  line1     String?
+  line2     String?
+  city      String?
+  region    String?
+  postal    String?
+  country   String    @default("US")
+  lat       Float?
+  lng       Float?
+  userId    String?
+  user      User?     @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+
+  pickupShipments   Shipment[] @relation("ShipmentPickup")
+  dropoffShipments  Shipment[] @relation("ShipmentDropoff")
+  buyerShipments    Shipment[] @relation("ShipmentBuyer")
+}
+
+model Carrier {
+  id            String      @id @default(cuid())
+  kind          CarrierKind @default(INDEPENDENT)
+  legalName     String
+  dba           String?
+  dotNumber     String?     @unique
+  mcNumber      String?     @unique
+  authorityActive Boolean   @default(false)
+  safetyScore   Int?        // 0..100, from carrier-monitoring (Phase 3)
+  trustScore    Int         @default(50) // 0..100, reliability
+  active        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  drivers    Driver[]
+  assets     Asset[]
+  legs       Leg[]
+  insurances Insurance[]
+}
+
+model Driver {
+  id          String     @id @default(cuid())
+  type        DriverType @default(INDEPENDENT)
+  name        String
+  phone       String?
+  licenseNo   String?
+  licenseState String?
+  active      Boolean    @default(true)
+  trustScore  Int        @default(50)
+  lastLat     Float?
+  lastLng     Float?
+  lastSeenAt  DateTime?
+
+  userId    String?  @unique
+  user      User?    @relation(fields: [userId], references: [id])
+  carrierId String?
+  carrier   Carrier? @relation(fields: [carrierId], references: [id])
+  createdAt DateTime @default(now())
+
+  legs           Leg[]
+  trackingPoints TrackingPoint[]
+  inspections    Inspection[]
+}
+
+model Asset {
+  id        String    @id @default(cuid())
+  type      AssetType
+  label     String
+  plate     String?
+  capacity  Int? // number of vehicles / units it can carry
+  carrierId String?
+  carrier   Carrier?  @relation(fields: [carrierId], references: [id])
+  createdAt DateTime  @default(now())
+
+  legs Leg[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// Auction channel
+// ─────────────────────────────────────────────────────────────
+
+model AuctionPartner {
+  id        String             @id @default(cuid())
+  code      AuctionPartnerCode @unique
+  name      String
+  enabled   Boolean            @default(true)
+  apiKey    String? // partner-scoped key for inbound API (hashed in prod)
+  createdAt DateTime           @default(now())
+
+  lots AuctionLot[]
+}
+
+model AuctionLot {
+  id            String         @id @default(cuid())
+  partnerId     String
+  partner       AuctionPartner @relation(fields: [partnerId], references: [id])
+  externalLotId String // the lot id in the partner's system
+  vin           String?
+  make          String?
+  model         String?
+  year          Int?
+  title         String?
+  salePriceCents Int?
+  buyerName     String?
+  buyerEmail    String?
+  location      String?
+  lat           Float?
+  lng           Float?
+  raw           Json? // original partner payload, for audit
+  createdAt     DateTime       @default(now())
+
+  shipment Shipment?
+
+  @@unique([partnerId, externalLotId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Core shipment graph
+// ─────────────────────────────────────────────────────────────
+
+model HandlingProfile {
+  id          String        @id @default(cuid())
+  commodity   CommodityType
+  name        String
+  // Requirements expressed generically so new commodities need no schema change.
+  requiresEnclosed Boolean  @default(false)
+  requiresLiftgate Boolean  @default(false)
+  hazmat      Boolean       @default(false)
+  liveCargo   Boolean       @default(false)
+  rules       Json? // commodity rules engine input (Phase 3)
+  createdAt   DateTime      @default(now())
+
+  cargoItems CargoItem[]
+}
+
+model Shipment {
+  id            String         @id @default(cuid())
+  trackingId    String         @unique // customer-facing id returned on booking
+  status        ShipmentStatus @default(DRAFT)
+  commodityId   String
+  commodity     Commodity      @relation(fields: [commodityId], references: [id])
+
+  // parties
+  buyerId   String?
+  buyer     Party?  @relation("ShipmentBuyer", fields: [buyerId], references: [id])
+  pickupId  String?
+  pickup    Party?  @relation("ShipmentPickup", fields: [pickupId], references: [id])
+  dropoffId String?
+  dropoff   Party?  @relation("ShipmentDropoff", fields: [dropoffId], references: [id])
+
+  // origin of the shipment (auction lot, if any)
+  auctionLotId String?     @unique
+  auctionLot   AuctionLot? @relation(fields: [auctionLotId], references: [id])
+
+  // money — customer-facing only. Driver/carrier pay lives on Leg + Payment.
+  // marginBps + payout are NEVER serialized to driver-scoped responses.
+  quotedPriceCents Int?
+  marginBps        Int? // snapshot of commodity margin at booking
+  distanceMiles    Float?
+  etaAt            DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cargoItems    CargoItem[]
+  legs          Leg[]
+  quotes        Quote[]
+  custodyEvents CustodyEvent[]
+  trackingPoints TrackingPoint[]
+  documents     Document[]
+  inspections   Inspection[]
+  aiDecisions   AIDecision[]
+  qaReviews     QAReview[]
+  payments      Payment[]
+  escrow        EscrowTransaction?
+  ratings       Rating[]
+  claims        Claim[]
+
+  @@index([status])
+  @@index([commodityId])
+}
+
+model CargoItem {
+  id          String    @id @default(cuid())
+  shipmentId  String
+  shipment    Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  profileId   String?
+  profile     HandlingProfile? @relation(fields: [profileId], references: [id])
+
+  description String
+  // vehicle specifics (nullable so non-vehicle commodities reuse the model)
+  vin         String?
+  make        String?
+  model       String?
+  year        Int?
+  odometer    Int?
+  // generic attributes for any commodity (weight, dims, headcount, etc.)
+  attrs       Json?
+  valueCents  Int?
+  createdAt   DateTime  @default(now())
+
+  inspections Inspection[]
+}
+
+model Leg {
+  id         String    @id @default(cuid())
+  shipmentId String
+  shipment   Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  sequence   Int       @default(0)
+  status     LegStatus @default(PLANNED)
+
+  originLabel String?
+  destLabel   String?
+  originLat   Float?
+  originLng   Float?
+  destLat     Float?
+  destLng     Float?
+
+  // assignment
+  carrierId String?
+  carrier   Carrier? @relation(fields: [carrierId], references: [id])
+  driverId  String?
+  driver    Driver?  @relation(fields: [driverId], references: [id])
+  assetId   String?
+  asset     Asset?   @relation(fields: [assetId], references: [id])
+
+  // driver/carrier pay — the ONLY money a driver may see. Never expose margin.
+  payoutCents Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shipmentId])
+  @@index([driverId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Custody (append-only, hash-chained) + tracking
+// ─────────────────────────────────────────────────────────────
+
+model CustodyEvent {
+  id         String           @id @default(cuid())
+  shipmentId String
+  shipment   Shipment         @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  sequence   Int // 0-based position in this shipment's chain
+  type       CustodyEventType
+  actorType  String // "system" | "ai" | "driver" | "user"
+  actorId    String?
+  payload    Json
+  prevHash   String
+  hash       String
+  createdAt  DateTime         @default(now())
+
+  @@unique([shipmentId, sequence])
+  @@index([shipmentId])
+}
+
+model TrackingPoint {
+  id         String   @id @default(cuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  driverId   String?
+  driver     Driver?  @relation(fields: [driverId], references: [id])
+  lat        Float
+  lng        Float
+  speedMph   Float?
+  heading    Float?
+  recordedAt DateTime @default(now())
+
+  @@index([shipmentId, recordedAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Documents, inspections & findings
+// ─────────────────────────────────────────────────────────────
+
+model Document {
+  id         String       @id @default(cuid())
+  shipmentId String?
+  shipment   Shipment?    @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  type       DocumentType
+  // storage key in S3/MinIO; served via StorageProvider signed URLs
+  storageKey String
+  mimeType   String?
+  sizeBytes  Int?
+  meta       Json?
+  createdAt  DateTime     @default(now())
+
+  @@index([shipmentId])
+}
+
+model Inspection {
+  id          String         @id @default(cuid())
+  shipmentId  String
+  shipment    Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  cargoItemId String?
+  cargoItem   CargoItem?     @relation(fields: [cargoItemId], references: [id])
+  driverId    String?
+  driver      Driver?        @relation(fields: [driverId], references: [id])
+  type        InspectionType
+  conditionScore Int? // 0..100 overall condition from AI walk-around
+  // AI envelope snapshot for the inspection decision
+  aiDecisionId String?    @unique
+  aiDecision   AIDecision? @relation(fields: [aiDecisionId], references: [id])
+  approvedByUserId String?
+  qaStatus    QAStatus       @default(pending)
+  createdAt   DateTime       @default(now())
+
+  findings Finding[]
+
+  @@index([shipmentId])
+}
+
+model Finding {
+  id           String          @id @default(cuid())
+  inspectionId String
+  inspection   Inspection      @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  // location on the vehicle diagram (e.g. "front-left-door")
+  panel        String?
+  kind         String // "scratch" | "dent" | "crack" | ...
+  severity     FindingSeverity @default(MINOR)
+  note         String?
+  // provenance: was this AI-detected or human-added/edited?
+  source       DecidedBy       @default(ai)
+  confidence   Float? // 0..1 for AI findings
+  createdAt    DateTime        @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────
+// AI decision log (human-in-the-loop + QA hook)
+// ─────────────────────────────────────────────────────────────
+
+model AIDecision {
+  id          String         @id @default(cuid())
+  kind        AIDecisionKind
+  shipmentId  String?
+  shipment    Shipment?      @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+
+  model       String
+  version     String
+  confidence  Float // 0..1
+  decidedBy   DecidedBy      @default(ai)
+  approvedByUserId String?
+  approvedBy  User?          @relation("AIApprovedBy", fields: [approvedByUserId], references: [id])
+  qaStatus    QAStatus       @default(pending)
+  needsHumanReview Boolean   @default(false)
+
+  input       Json
+  output      Json
+  createdAt   DateTime       @default(now())
+
+  inspection Inspection?
+  qaReviews  QAReview[]
+
+  @@index([kind])
+  @@index([shipmentId])
+  @@index([needsHumanReview])
+}
+
+model QAReview {
+  id           String      @id @default(cuid())
+  shipmentId   String?
+  shipment     Shipment?   @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+  aiDecisionId String?
+  aiDecision   AIDecision? @relation(fields: [aiDecisionId], references: [id])
+  reviewerId   String?
+  reviewer     User?       @relation("QAReviewer", fields: [reviewerId], references: [id])
+  status       QAStatus    @default(pending)
+  note         String?
+  createdAt    DateTime    @default(now())
+  decidedAt    DateTime?
+
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Money: payments, settlement, escrow
+// ─────────────────────────────────────────────────────────────
+
+model Payment {
+  id         String           @id @default(cuid())
+  shipmentId String
+  shipment   Shipment         @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  direction  PaymentDirection
+  method     PaymentMethod
+  status     PaymentStatus    @default(PENDING)
+  amountCents Int
+  feeCents   Int              @default(0) // quick-pay / processing fee (a revenue stream)
+  // who is paid (for PAYOUT). Drivers only ever see their own payout rows.
+  driverId   String?
+  carrierId  String?
+  quickPay   Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+  settledAt  DateTime?
+
+  @@index([shipmentId])
+}
+
+model EscrowTransaction {
+  id         String      @id @default(cuid())
+  shipmentId String      @unique
+  shipment   Shipment    @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  state      EscrowState @default(FEE_COLLECTED)
+  provider   String      @default("stub")
+  feeCents   Int         @default(0) // assurance fee (both sides, configurable)
+  heldCents  Int         @default(0)
+  releasedCents Int      @default(0)
+  externalRef String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────
+// Trust, insurance & claims
+// ─────────────────────────────────────────────────────────────
+
+model Rating {
+  id         String   @id @default(cuid())
+  shipmentId String?
+  shipment   Shipment? @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+  authorId   String?
+  author     User?    @relation("RatingAuthor", fields: [authorId], references: [id])
+  subjectType String // "carrier" | "driver" | "customer"
+  subjectId  String
+  stars      Int // 1..5
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  @@index([subjectType, subjectId])
+}
+
+model Insurance {
+  id         String        @id @default(cuid())
+  carrierId  String
+  carrier    Carrier       @relation(fields: [carrierId], references: [id])
+  type       InsuranceType
+  provider   String
+  policyNo   String?
+  coverageCents Int?
+  effectiveAt DateTime?
+  expiresAt  DateTime?
+  active     Boolean       @default(true)
+  createdAt  DateTime      @default(now())
+
+  @@index([carrierId])
+}
+
+model Claim {
+  id         String      @id @default(cuid())
+  shipmentId String
+  shipment   Shipment    @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  status     ClaimStatus @default(OPEN)
+  amountCents Int?
+  description String
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────
+// Quotes (Module 1)
+// ─────────────────────────────────────────────────────────────
+
+model Quote {
+  id           String      @id @default(cuid())
+  shipmentId   String
+  shipment     Shipment    @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  priceCents   Int
+  distanceMiles Float?
+  etaAt        DateTime?
+  status       QuoteStatus @default(ACTIVE)
+  expiresAt    DateTime?
+  // provenance from AI pricing
+  aiDecisionId String?
+  model        String?
+  confidence   Float?
+  createdAt    DateTime    @default(now())
+
+  @@index([shipmentId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Equipment leasing marketplace (Phase 4)
+// ─────────────────────────────────────────────────────────────
+
+model EquipmentListing {
+  id          String   @id @default(cuid())
+  lessorUserId String
+  title       String
+  assetType   AssetType
+  description String?
+  dailyRateCents Int
+  location    String?
+  available   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  leases Lease[]
+}
+
+model Lease {
+  id         String      @id @default(cuid())
+  listingId  String
+  listing    EquipmentListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  lesseeUserId String
+  status     LeaseStatus @default(LISTED)
+  startAt    DateTime?
+  endAt      DateTime?
+  rateCents  Int
+  createdAt  DateTime    @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────
+// Transactional outbox (event bus durability; drained to EventBus)
+// ─────────────────────────────────────────────────────────────
+
+model Outbox {
+  id          String    @id @default(cuid())
+  topic       String
+  payload     Json
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([publishedAt])
+}
