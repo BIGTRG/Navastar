@@ -9,7 +9,13 @@ users, prioritized. Severity: **P0** (blocks any real deploy / security bug) ·
 
 ---
 
-## P0 — Correctness & security blockers
+> **Status (2026-07-24): all five P0 items are RESOLVED** — each on its own
+> `fix/p0-*` branch (`fix/p0-1-object-authz`, `fix/p0-2-integration-harness`,
+> `fix/p0-3-migrations`, `fix/p0-4-gate-simulators`, `fix/p0-5-secrets-ratelimit`).
+> 96 unit/guard tests + 3 DB integration tests (skip without `TEST_DATABASE_URL`).
+> P1–P3 below remain.
+
+## P0 — Correctness & security blockers ✅ RESOLVED
 
 ### 1. Object-level authorization is missing on shipment reads/writes
 Today `GET /api/shipments/:id`, `/track`, `POST /api/quotes`, and `/book` check a
