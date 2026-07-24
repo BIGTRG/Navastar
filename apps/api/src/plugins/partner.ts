@@ -4,6 +4,7 @@
 import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from "fastify";
 import { prisma } from "@navastar/db";
+import { hashApiKey } from "@navastar/shared";
 
 export interface PartnerPrincipal {
   id: string;
@@ -26,7 +27,8 @@ export default fp(async function partnerPlugin(app: FastifyInstance) {
   app.decorate("requirePartner", async function (req: FastifyRequest, reply: FastifyReply) {
     const header = (req.headers["x-api-key"] as string | undefined) ?? bearer(req.headers.authorization);
     if (!header) return reply.code(401).send({ error: "unauthorized", message: "API key required (x-api-key)." });
-    const partner = await prisma.auctionPartner.findFirst({ where: { apiKey: header, enabled: true } });
+    // Look up by hash — the plaintext key is never stored.
+    const partner = await prisma.auctionPartner.findFirst({ where: { apiKeyHash: hashApiKey(header), enabled: true } });
     if (!partner) return reply.code(401).send({ error: "invalid_api_key" });
     req.partner = { id: partner.id, code: partner.code, name: partner.name };
   });

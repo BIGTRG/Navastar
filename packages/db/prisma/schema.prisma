@@ -388,7 +388,8 @@ model AuctionPartner {
   code      AuctionPartnerCode @unique
   name      String
   enabled   Boolean            @default(true)
-  apiKey    String? // partner-scoped key for inbound API (hashed in prod)
+  // SHA-256 of the partner API key (the plaintext key is never stored).
+  apiKeyHash String?           @unique
   createdAt DateTime           @default(now())
 
   lots     AuctionLot[]

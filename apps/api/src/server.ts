@@ -1,6 +1,7 @@
 // Builds the Fastify app (no listen) so tests can import it directly.
 import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
@@ -38,6 +39,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   await app.register(cors, { origin: true, credentials: true });
+  // Baseline rate limiting (P0 #5); per-route overrides tighten sensitive endpoints.
+  await app.register(rateLimit, { global: true, max: 300, timeWindow: "1 minute" });
   await app.register(websocket);
 
   // OpenAPI (served at /api/openapi.json) + interactive docs at /api/docs.

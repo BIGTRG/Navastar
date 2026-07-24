@@ -1,6 +1,7 @@
 // Navastar demo seed. Idempotent-ish: upserts stable rows by natural keys.
 // Run: pnpm db:seed  (after `pnpm db:push` or `pnpm db:migrate`)
 import bcrypt from "bcryptjs";
+import { createHash } from "node:crypto";
 import {
   prisma,
   Role,
@@ -66,14 +67,16 @@ async function main() {
     { code: AuctionPartnerCode.MANHEIM, name: "Manheim" },
     { code: AuctionPartnerCode.ADESA, name: "ADESA" },
   ];
+  // Demo partner API keys are `demo-key-<code>`; only their SHA-256 hash is stored.
+  const apiKeyHash = (code: string) => createHash("sha256").update(`demo-key-${code.toLowerCase()}`).digest("hex");
   for (const p of partners) {
     await prisma.auctionPartner.upsert({
       where: { code: p.code },
-      update: { name: p.name },
-      create: { ...p, apiKey: `demo-key-${p.code.toLowerCase()}` },
+      update: { name: p.name, apiKeyHash: apiKeyHash(p.code) },
+      create: { ...p, apiKeyHash: apiKeyHash(p.code) },
     });
   }
-  console.log(`  ✓ ${partners.length} auction partners`);
+  console.log(`  ✓ ${partners.length} auction partners (demo key: demo-key-<code>)`);
 
   // ── Users, one per role ──
   const users: Array<{ email: string; name: string; roles: Role[] }> = [
