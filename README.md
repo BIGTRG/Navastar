@@ -165,5 +165,16 @@ charged (inbound revenue).
 | POST | `/api/loadboard/bids/:id/award` | `load:post` | award → assign + connection fee |
 | POST | `/api/loadboard/subscribe` | `load_board:view` | subscribe / change tier |
 
-Deployment to a self-hosted Hetzner server (Caddy auto-HTTPS, nightly backups,
-one-command deploy) is added in the deployment phase — see the roadmap.
+## Deploy (self-hosted)
+Production stack — web (Caddy: SPA + auto-HTTPS + API/WS reverse proxy) + api +
+Postgres + MinIO + nightly backups — in [`docker-compose.prod.yml`](docker-compose.prod.yml):
+```bash
+cp .env.example .env   # set DOMAIN, JWT_SECRET, POSTGRES_PASSWORD, S3 keys
+./scripts/deploy.sh    # git pull && docker compose -f docker-compose.prod.yml up -d --build
+```
+Full walkthrough (DNS, firewall, MinIO media, backups/restore): **[docs/DEPLOY.md](docs/DEPLOY.md)**.
+
+---
+
+**Status: all 15 modules across Phases 1–4 + the deployment phase are complete.**
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the module-by-module checklist.

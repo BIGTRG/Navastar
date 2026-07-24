@@ -34,5 +34,5 @@ for go. Legend: ✅ done · 🟡 in progress · ⬜ not started.
 - ✅ **Module 15 — Deeper AI**: per-capability vendor routing via CompositeAIProvider (inspection → Ravin / ProovStation-UVeye / **our own model**; OCR → vendor; selected by env, zero-key fallback to stub) — real vendors drop in with no call-site changes. Support copilot endpoint (AI-first + human handoff), demand/revenue forecasting, on-demand fraud check; each AI call logged via runAi. Web Copilot tab (support chat + ops forecast).
 
 ## Deployment (self-hosted on Hetzner)
-- ⬜ `docker-compose.prod.yml` (web + api + postgres + minio + Caddy auto-HTTPS)
-- ⬜ Nightly pg_dump backup + one-command deploy + "Deploy to your own Hetzner server" README
+- ✅ **`docker-compose.prod.yml`** — web (Caddy: SPA + auto-HTTPS + reverse-proxy for API & WebSocket) + api + postgres (persistent volume) + minio (+ bucket setup). Dockerfiles for api (tsx runtime, Alpine + musl Prisma engine) and web (build → Caddy).
+- ✅ **Nightly pg_dump backup** sidecar (keeps last 14) + **one-command deploy** (`scripts/deploy.sh` = git pull && compose up -d --build) + **"Deploy to your own Hetzner server"** guide ([docs/DEPLOY.md](./DEPLOY.md): DNS A record, ufw 22/80/443, MinIO media, restores).

@@ -9,7 +9,9 @@
 //  - Every AI output writes an AIDecision row (human-in-the-loop + QA hook).
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // native = local dev; linux-musl target = the Alpine-based production container.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
