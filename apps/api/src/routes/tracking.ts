@@ -9,6 +9,7 @@ import { recordTrackingPoint } from "../lib/tracking.js";
 import { startSimulation, stopSimulation, isSimulating } from "../lib/simulator.js";
 import { hub } from "../realtime.js";
 import { canAccessShipment } from "../lib/access.js";
+import { demoEnabled } from "../lib/demo.js";
 
 const pingBody = z.object({
   lat: z.number(),
@@ -76,6 +77,7 @@ export default async function trackingRoutes(app: FastifyInstance) {
     "/api/shipments/:id/simulate",
     { preHandler: [app.requirePermission(Permission.DISPATCH_ASSIGN)] },
     async (req, reply) => {
+      if (!demoEnabled()) return reply.code(403).send({ error: "demo_disabled", message: "Simulators are disabled in production." });
       const { id } = req.params as { id: string };
       const parsed = simBody.safeParse(req.body);
       if (!parsed.success) return reply.code(400).send({ error: "bad_request", issues: parsed.error.issues });

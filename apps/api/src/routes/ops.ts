@@ -14,6 +14,7 @@ import { Permission, splitRate, type AuthPrincipal } from "@navastar/shared";
 import { serializeShipment } from "../lib/serialize.js";
 import { hub, OPS_ROOM } from "../realtime.js";
 import { startRoam, stopRoam, roamingIds } from "../lib/driverSim.js";
+import { demoEnabled } from "../lib/demo.js";
 
 const ACTIVE: ShipmentStatus[] = [
   ShipmentStatus.BOOKED,
@@ -166,6 +167,7 @@ export default async function opsRoutes(app: FastifyInstance) {
 
   // Demo: animate a driver on the map.
   app.post("/api/ops/drivers/:id/roam", { preHandler: [app.requirePermission(Permission.DISPATCH_ASSIGN)] }, async (req, reply) => {
+    if (!demoEnabled()) return reply.code(403).send({ error: "demo_disabled", message: "Fleet roam simulator is disabled in production." });
     const { id } = req.params as { id: string };
     const res = await startRoam(id);
     return reply.code(res.alreadyRunning ? 200 : 202).send({ driverId: id, ...res });
