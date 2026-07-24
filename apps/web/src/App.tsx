@@ -24,6 +24,7 @@ import { LoadBoard } from "./components/LoadBoard.js";
 import { Onboarding } from "./components/Onboarding.js";
 import { Payments } from "./components/Payments.js";
 import { Compliance } from "./components/Compliance.js";
+import { Monitoring } from "./components/Monitoring.js";
 
 // ─────────────────────────────────────────────────────────────
 // Root
@@ -31,7 +32,7 @@ import { Compliance } from "./components/Compliance.js";
 export function App() {
   const [user, setUser] = useState<LoginResponse["user"] | null>(null);
   const [tab, setTab] = useState<
-    "deliver" | "track" | "driver" | "ops" | "qa" | "dispatch" | "loadboard" | "onboarding" | "pay" | "compliance"
+    | "deliver" | "track" | "driver" | "ops" | "qa" | "dispatch" | "loadboard" | "onboarding" | "pay" | "compliance" | "risk"
   >("deliver");
 
   useEffect(() => {
@@ -91,6 +92,11 @@ export function App() {
                   Compliance
                 </TabButton>
               )}
+              {user.roles.some((r) => ["dispatcher", "qa_reviewer", "admin"].includes(r)) && (
+                <TabButton active={tab === "risk"} onClick={() => setTab("risk")}>
+                  Trust &amp; Risk
+                </TabButton>
+              )}
               {user.roles.some((r) =>
                 ["independent_carrier", "lease_operator", "dispatcher", "admin"].includes(r)
               ) && (
@@ -144,6 +150,9 @@ export function App() {
             )}
             {tab === "qa" && <QAConsole />}
             {tab === "compliance" && <Compliance />}
+            {tab === "risk" && (
+              <Monitoring canManageClaims={user.roles.some((r) => r === "dispatcher" || r === "admin")} />
+            )}
           </>
         )}
       </main>

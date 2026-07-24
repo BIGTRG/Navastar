@@ -23,6 +23,7 @@ import onboardingRoutes from "./routes/onboarding.js";
 import paymentRoutes from "./routes/payments.js";
 import partnerRoutes from "./routes/partner.js";
 import complianceRoutes from "./routes/compliance.js";
+import trustRoutes from "./routes/trust.js";
 import { hub } from "./realtime.js";
 import { initPayments } from "./lib/payments.js";
 import { initWebhooks } from "./lib/webhooks.js";
@@ -90,6 +91,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(partnerRoutes);
   // Module 11 — custody & compliance (rules engine + chain verify/export).
   await app.register(complianceRoutes);
+  // Module 12 — ratings & trust, insurance & claims, carrier-monitoring.
+  await app.register(trustRoutes);
 
   app.setErrorHandler((err, _req, reply) => {
     const status = (err as { statusCode?: number }).statusCode ?? 500;

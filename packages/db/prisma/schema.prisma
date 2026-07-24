@@ -318,6 +318,9 @@ model Carrier {
   trustScore    Int         @default(50) // 0..100, reliability
   onboardingStatus OnboardingStatus @default(PENDING)
   fmcsaVerifiedAt DateTime?
+  // Carrier-monitoring (SEPARATE from GPS): compliance/fraud posture.
+  riskScore       Int?      // 0..100 double-broker / fraud risk (higher = riskier)
+  lastMonitoredAt DateTime?
   active        Boolean     @default(true)
   // The user who operates this carrier (posts/bids on the load board as them).
   ownerUserId   String?

@@ -336,6 +336,28 @@ export interface PayoutRow {
   settledAt: string | null;
 }
 
+// ── Module 12 — trust / monitoring ──
+export interface MonitoringCarrier {
+  id: string;
+  legalName: string;
+  dotNumber: string | null;
+  authorityActive: boolean;
+  insuranceValid: boolean;
+  safetyScore: number | null;
+  trustScore: number;
+  riskScore: number | null;
+  lastMonitoredAt: string | null;
+  alerts: string[];
+}
+export interface ClaimRow {
+  id: string;
+  trackingId: string | null;
+  status: string;
+  amountCents: number | null;
+  description: string;
+  createdAt: string;
+}
+
 export function opsSocketUrl(): string {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   return `${proto}://${location.host}/ws/ops?token=${getToken() ?? ""}`;

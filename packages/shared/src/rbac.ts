@@ -39,6 +39,12 @@ export const Permission = {
   PAYMENTS_SETTLE: "payments:settle",
   // compliance / custody
   COMPLIANCE_VIEW: "compliance:view",
+  // trust / insurance / monitoring
+  RATING_SUBMIT: "rating:submit",
+  CLAIM_FILE: "claim:file",
+  CLAIM_MANAGE: "claim:manage",
+  INSURANCE_MANAGE: "insurance:manage",
+  MONITORING_VIEW: "monitoring:view",
   // qa
   QA_REVIEW: "qa:review",
   // admin / revenue
@@ -60,6 +66,8 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.SHIPMENT_BOOK,
     P.SHIPMENT_READ_OWN,
     P.SHIPMENT_TRACK,
+    P.RATING_SUBMIT,
+    P.CLAIM_FILE,
   ],
   [Role.auction_partner]: [P.AUCTION_LOT_CREATE, P.QUOTE_CREATE, P.SHIPMENT_BOOK, P.SHIPMENT_TRACK],
   [Role.independent_carrier]: [
@@ -111,8 +119,13 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.PAYMENTS_VIEW,
     P.PAYMENTS_SETTLE,
     P.COMPLIANCE_VIEW,
+    P.RATING_SUBMIT,
+    P.CLAIM_FILE,
+    P.CLAIM_MANAGE,
+    P.INSURANCE_MANAGE,
+    P.MONITORING_VIEW,
   ],
-  [Role.qa_reviewer]: [P.QA_REVIEW, P.SHIPMENT_READ_ALL, P.SHIPMENT_TRACK, P.COMPLIANCE_VIEW],
+  [Role.qa_reviewer]: [P.QA_REVIEW, P.SHIPMENT_READ_ALL, P.SHIPMENT_TRACK, P.COMPLIANCE_VIEW, P.MONITORING_VIEW],
   [Role.equipment_lessor]: [P.SHIPMENT_TRACK],
   [Role.admin]: [P.ADMIN_ALL], // expanded to all permissions by hasPermission()
 };
