@@ -233,6 +233,13 @@ enum LeaseStatus {
   CANCELLED
 }
 
+enum OnboardingStatus {
+  PENDING
+  DOCS_SUBMITTED
+  VERIFIED
+  REJECTED
+}
+
 // ─────────────────────────────────────────────────────────────
 // Identity & RBAC
 // ─────────────────────────────────────────────────────────────
@@ -309,6 +316,8 @@ model Carrier {
   authorityActive Boolean   @default(false)
   safetyScore   Int?        // 0..100, from carrier-monitoring (Phase 3)
   trustScore    Int         @default(50) // 0..100, reliability
+  onboardingStatus OnboardingStatus @default(PENDING)
+  fmcsaVerifiedAt DateTime?
   active        Boolean     @default(true)
   // The user who operates this carrier (posts/bids on the load board as them).
   ownerUserId   String?
@@ -331,6 +340,9 @@ model Driver {
   phone       String?
   licenseNo   String?
   licenseState String?
+  licenseVerified Boolean @default(false)
+  backgroundCheckStatus String? // employees (W-2): pending|clear|flagged
+  onboardingStatus OnboardingStatus @default(PENDING)
   active      Boolean    @default(true)
   trustScore  Int        @default(50)
   lastLat     Float?

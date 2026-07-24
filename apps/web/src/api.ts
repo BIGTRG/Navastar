@@ -310,6 +310,19 @@ export interface LoadBidRow {
   carrier: { name: string; trust: number; safety: number | null; authorityActive: boolean } | null;
 }
 
+// ── Module 8 — onboarding ──
+export interface FmcsaPrefill {
+  legalName: string;
+  dba?: string;
+  authorityActive: boolean;
+  safetyScore?: number;
+  insuranceOnFile: boolean;
+}
+export interface PendingOnboarding {
+  carriers: Array<{ id: string; legalName: string; dotNumber: string | null; mcNumber: string | null; onboardingStatus: string; insuranceCount: number }>;
+  drivers: Array<{ id: string; name: string; type: string; onboardingStatus: string; backgroundCheckStatus: string | null }>;
+}
+
 export function opsSocketUrl(): string {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   return `${proto}://${location.host}/ws/ops?token=${getToken() ?? ""}`;
