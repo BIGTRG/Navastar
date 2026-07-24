@@ -212,6 +212,47 @@ export interface OpsLiveMessage {
   name?: string;
 }
 
+// ── Module 5 — QA ──
+export interface QaQueueItem {
+  inspectionId: string;
+  shipmentId: string;
+  trackingId: string;
+  type: string;
+  conditionScore: number | null;
+  findingsCount: number;
+  approved: boolean;
+  aiConfidence: number | null;
+  needsHumanReview: boolean;
+  createdAt: string;
+}
+export interface QaQueue {
+  counts: { pending: number; pass: number; fix: number; fail: number };
+  queue: QaQueueItem[];
+}
+export interface QaDetail {
+  inspection: { id: string; type: string; conditionScore: number | null; qaStatus: string; approvedByUserId: string | null };
+  findings: Array<{ panel?: string; kind: string; severity: string; note?: string; source: "ai" | "human"; confidence?: number }>;
+  ai: { model: string; version: string; confidence: number; needsHumanReview: boolean; qaStatus: string; approvedByUserId: string | null } | null;
+  cargo: Array<{ description: string; vin?: string | null; odometer?: number | null }>;
+  custody: {
+    ok: boolean;
+    length: number;
+    brokenAtSequence: number | null;
+    events: Array<{ sequence: number; type: string; at: string; hash: string }>;
+  };
+  documents: Array<{ id: string; type: string; url: string }>;
+}
+export interface QaReliabilityRow {
+  id: string;
+  name: string;
+  type: string;
+  trustScore: number;
+  carrier: string;
+  carrierTrust: number | null;
+  reviewed: number;
+  passRate: number | null;
+}
+
 export function opsSocketUrl(): string {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   return `${proto}://${location.host}/ws/ops?token=${getToken() ?? ""}`;

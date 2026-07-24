@@ -15,7 +15,7 @@ for go. Legend: ✅ done · 🟡 in progress · ⬜ not started.
 - ✅ **Module 2 — Customer tracking**: live location over WebSocket (RealtimeHub + event-bus bridge), live Leaflet/OSM map, live ETA recompute via MapProvider, status timeline; demo movement simulator (`POST /api/shipments/:id/simulate`)
 - ✅ **Module 3 — Driver app**: job list; guided pickup with AI walk-around inspection (condition score + findings on an editable vehicle diagram, human-approved), VIN/odometer OCR stub, complete-pickup; delivery with signature pad + photo POD. **Real MinIO/S3 storage adapter** (presigned direct-to-storage uploads). POD fires `pod.signed` (escrow-release hook for Module 9).
 - ✅ **Module 4 — Ops dashboard**: KPIs (active/delivered/exceptions/GMV/revenue/blended take rate/avg AI confidence/needs-review), filterable shipments table (status/commodity/search, margin shown to margin:view roles), exceptions + human-review queue, and the **Global GPS map** of active drivers (fleet=blue / contractor=red) live over a WS ops channel with roster + filters + roam simulator.
-- ⬜ Module 5 — QA console (review queue, Pass/Fix/Fail)
+- ✅ **Module 5 — QA console**: review queue (driver-approved inspections pending QA) showing AI findings (with source), the verified hash-chained custody chain, and POD/photos; Pass/Fix/Fail writes a QAReview + sets qaStatus on inspection & AIDecision; decisions feed driver/carrier reliability (trust) scores. Reliability leaderboard with pass rates. **Completes the AI → human-approve → QA-verify loop and closes Phase 1.**
 
 ## Phase 2 — Brokerage & network
 - ⬜ Module 6 — Dispatch & matching engine

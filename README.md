@@ -120,5 +120,19 @@ roam them — the dot moves live over the ops WebSocket.
 | GET | `/api/ops/exceptions` | `ops_dashboard:read` | exceptions + review queue |
 | WS | `/ws/ops?token=` | valid JWT | live `driver.location` stream |
 
+### Try the QA console (Module 5)
+Sign in as `qa@demo.navastar` → **QA** tab. The review queue holds driver-approved
+inspections awaiting QA. Open one to see AI findings (tagged AI vs driver), the
+**custody chain integrity check**, and POD/photos, then **Pass / Fix / Fail** — the
+decision writes a `QAReview`, stamps `qaStatus`, and moves the driver's **reliability
+score** (see the Reliability tab). This closes the AI → human-approve → QA-verify loop.
+
+| Method | Path | Permission | Purpose |
+|---|---|---|---|
+| GET | `/api/qa/queue` | `qa:review` | inspections awaiting QA + counts |
+| GET | `/api/qa/inspections/:id` | `qa:review` | findings + custody + POD detail |
+| POST | `/api/qa/inspections/:id/decision` | `qa:review` | Pass/Fix/Fail → reliability |
+| GET | `/api/qa/reliability` | `qa:review` | driver trust scores + pass rates |
+
 Deployment to a self-hosted Hetzner server (Caddy auto-HTTPS, nightly backups,
 one-command deploy) is added in the deployment phase — see the roadmap.
