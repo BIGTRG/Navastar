@@ -40,20 +40,27 @@ export default async function equipmentRoutes(app: FastifyInstance) {
     if (!listing) return reply.code(404).send({ error: "listing_not_found" });
     if (!listing.available) return reply.code(409).send({ error: "not_available" });
 
-    const lease = await prisma.$transaction(async (tx) => {
-      const created = await tx.lease.create({
-        data: {
-          listingId: id,
-          lesseeUserId: req.principal!.userId,
-          status: LeaseStatus.ACTIVE,
-          rateCents: listing.dailyRateCents,
-          startAt: body.startAt ? new Date(body.startAt) : new Date(),
-          endAt: body.endAt ? new Date(body.endAt) : null,
-        },
+    let lease;
+    try {
+      lease = await prisma.$transaction(async (tx) => {
+        // Atomic reserve: only one lessee can flip available true → false (P1 #10).
+        const reserved = await tx.equipmentListing.updateMany({ where: { id, available: true }, data: { available: false } });
+        if (reserved.count === 0) throw Object.assign(new Error("not_available"), { statusCode: 409 });
+        return tx.lease.create({
+          data: {
+            listingId: id,
+            lesseeUserId: req.principal!.userId,
+            status: LeaseStatus.ACTIVE,
+            rateCents: listing.dailyRateCents,
+            startAt: body.startAt ? new Date(body.startAt) : new Date(),
+            endAt: body.endAt ? new Date(body.endAt) : null,
+          },
+        });
       });
-      await tx.equipmentListing.update({ where: { id }, data: { available: false } });
-      return created;
-    });
+    } catch (e) {
+      const code = (e as { statusCode?: number }).statusCode ?? 500;
+      return reply.code(code).send({ error: (e as Error).message });
+    }
     return reply.code(201).send({ leaseId: lease.id, status: lease.status, rateCents: lease.rateCents });
   });
 

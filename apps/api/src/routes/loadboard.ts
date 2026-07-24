@@ -146,6 +146,7 @@ export default async function loadboardRoutes(app: FastifyInstance) {
 
       const post = await prisma.loadPost.findUnique({ where: { id } });
       if (!post || post.status !== LoadPostStatus.OPEN) return reply.code(409).send({ error: "load_not_open" });
+      if (post.expiresAt && post.expiresAt < new Date()) return reply.code(409).send({ error: "load_expired" });
       if (post.minBidCents != null && body.data.amountCents < post.minBidCents) {
         return reply.code(422).send({ error: "below_min_bid", minBidCents: post.minBidCents });
       }
@@ -207,9 +208,20 @@ export default async function loadboardRoutes(app: FastifyInstance) {
       const shipmentId = bid.loadPost.shipmentId;
 
       const result = await prisma.$transaction(async (tx) => {
+        // Atomic compare-and-set: only ONE award can flip OPEN → AWARDED (P1 #10).
+        const claimed = await tx.loadPost.updateMany({
+          where: {
+            id: bid.loadPostId,
+            status: LoadPostStatus.OPEN,
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          },
+          data: { status: LoadPostStatus.AWARDED },
+        });
+        if (claimed.count === 0) {
+          throw Object.assign(new Error("already_awarded"), { statusCode: 409 });
+        }
         await tx.bid.update({ where: { id: bid.id }, data: { status: BidStatus.WON } });
         await tx.bid.updateMany({ where: { loadPostId: bid.loadPostId, id: { not: bid.id } }, data: { status: BidStatus.LOST } });
-        await tx.loadPost.update({ where: { id: bid.loadPostId }, data: { status: LoadPostStatus.AWARDED } });
 
         const seq = await tx.leg.count({ where: { shipmentId } });
         const leg = await tx.leg.create({

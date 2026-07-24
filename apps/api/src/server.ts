@@ -5,6 +5,7 @@ import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
+import { env } from "./config.js";
 import authPlugin from "./plugins/auth.js";
 import partnerPlugin from "./plugins/partner.js";
 import healthRoutes from "./routes/health.js";
@@ -38,7 +39,11 @@ export async function buildApp(): Promise<FastifyInstance> {
     logger: process.env.NODE_ENV === "test" ? false : { level: process.env.LOG_LEVEL ?? "info" },
   });
 
-  await app.register(cors, { origin: true, credentials: true });
+  // CORS: in production, allow ONLY the app's own domain (P1 #8). In dev/test,
+  // reflect the request origin so localhost tooling works.
+  const corsOrigin =
+    env.NODE_ENV === "production" ? [`https://${env.DOMAIN}`, `https://www.${env.DOMAIN}`] : true;
+  await app.register(cors, { origin: corsOrigin, credentials: true });
   // Baseline rate limiting (P0 #5); per-route overrides tighten sensitive endpoints.
   await app.register(rateLimit, { global: true, max: 300, timeWindow: "1 minute" });
   await app.register(websocket);
