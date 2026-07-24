@@ -126,7 +126,13 @@ export default async function partnerRoutes(app: FastifyInstance) {
     const ep = await prisma.webhookEndpoint.create({
       data: { partnerId: req.partner!.id, url: body.data.url, events: body.data.events, secret },
     });
-    return reply.code(201).send({ id: ep.id, url: ep.url, events: ep.events, secret, note: "Verify deliveries with HMAC-SHA256 over the raw body using this secret (x-navastar-signature)." });
+    return reply.code(201).send({
+      id: ep.id,
+      url: ep.url,
+      events: ep.events,
+      secret,
+      note: "Verify each delivery: x-navastar-signature = 'sha256=' + HMAC_SHA256(secret, `${x-navastar-timestamp}.${rawBody}`). Reject if the timestamp is older than 300s.",
+    });
   });
 
   app.get("/api/partner/webhooks", { ...auth, schema: { tags: ["partner"], summary: "List webhooks" } }, async (req) => {
