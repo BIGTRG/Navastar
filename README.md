@@ -65,7 +65,16 @@ Other demo logins (all `password123`): `dispatch@demo.navastar` (can see margin)
 ## Test
 ```bash
 pnpm db:generate   # required once so @navastar/db can import the client
-pnpm test          # unit tests: money/margin, RBAC, custody hash-chain, connectors, API guards
+pnpm test          # unit + guard tests (no DB needed)
+```
+**Integration tests** (real end-to-end flows) run against a live Postgres and
+self-skip otherwise:
+```bash
+createdb navastar_test    # or use the docker Postgres
+export TEST_DATABASE_URL="postgresql://navastar:navastar@localhost:5432/navastar_test?schema=public"
+DATABASE_URL="$TEST_DATABASE_URL" pnpm --filter @navastar/db push
+DATABASE_URL="$TEST_DATABASE_URL" pnpm --filter @navastar/db seed
+pnpm --filter @navastar/api test   # now the integration suite runs too
 ```
 
 ## API quick reference (Module 1)
