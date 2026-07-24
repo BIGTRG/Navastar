@@ -739,6 +739,9 @@ model Payment {
   carrierId  String?
   quickPay   Boolean          @default(false)
   memo       String? // e.g. "load_board_connection_fee", "quick_pay_fee"
+  externalRef String? // processor reference (Stripe/…); null for stub
+  // Idempotency key — a unique constraint prevents double-charging/paying.
+  idempotencyKey String?      @unique
   createdAt  DateTime         @default(now())
   settledAt  DateTime?
 

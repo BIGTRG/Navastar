@@ -14,7 +14,7 @@ import {
   PaymentStatus,
 } from "@navastar/db";
 import { splitRate } from "@navastar/shared";
-import { getEscrowConnector } from "@navastar/providers";
+import { getEscrowConnector, getPaymentProcessor } from "@navastar/providers";
 import { bus } from "../events.js";
 import { revenueConfig, feeOf } from "./revenue.js";
 
@@ -33,6 +33,14 @@ export async function initEscrowForShipment(shipmentId: string) {
   const opened = await escrowConn.open({ shipmentId, feeCents: assuranceFee, holdCents: heldCents });
   const funded = await escrowConn.fund(opened.externalRef);
 
+  // Charge the customer via the payment processor (idempotent per shipment).
+  const charge = await getPaymentProcessor().charge({
+    amountCents: price,
+    method: "CARD",
+    memo: "booking_fee_up_front",
+    idempotencyKey: `charge:${shipmentId}`,
+  });
+
   await prisma.$transaction(async (tx) => {
     // Inbound customer payment — fee captured up front at booking.
     await tx.payment.create({
@@ -44,6 +52,8 @@ export async function initEscrowForShipment(shipmentId: string) {
         amountCents: price,
         feeCents: assuranceFee,
         memo: "booking_fee_up_front",
+        externalRef: charge.externalRef,
+        idempotencyKey: `charge:${shipmentId}`,
       },
     });
     await tx.escrowTransaction.create({
@@ -90,6 +100,7 @@ export async function releaseEscrowForShipment(shipmentId: string) {
           driverId: leg.driverId,
           carrierId: leg.carrierId,
           memo: "carrier_payout_weekly",
+          idempotencyKey: `payout:${shipmentId}`,
         },
       });
     }
@@ -115,6 +126,13 @@ export async function quickPay(paymentId: string) {
   const cfg = await revenueConfig();
   const fee = feeOf(payment.amountCents, cfg.quickPayFeeBps);
 
+  // Instant payout through the processor (idempotent per payment).
+  const po = await getPaymentProcessor().payout({
+    amountCents: payment.amountCents - fee,
+    memo: "carrier_payout_quickpay",
+    idempotencyKey: `payout-instant:${paymentId}`,
+  });
+
   const updated = await prisma.payment.update({
     where: { id: paymentId },
     data: {
@@ -124,6 +142,7 @@ export async function quickPay(paymentId: string) {
       status: PaymentStatus.SETTLED,
       settledAt: new Date(),
       memo: "carrier_payout_quickpay",
+      externalRef: po.externalRef,
     },
   });
   // Mark escrow PAID (best-effort; escrow may already be RELEASED).
@@ -144,9 +163,11 @@ export async function settleWeekly() {
   const pending = await prisma.payment.findMany({
     where: { direction: PaymentDirection.PAYOUT, status: PaymentStatus.PENDING, quickPay: false },
   });
+  const processor = getPaymentProcessor();
   let settled = 0;
   for (const p of pending) {
-    await prisma.payment.update({ where: { id: p.id }, data: { status: PaymentStatus.SETTLED, settledAt: new Date() } });
+    const po = await processor.payout({ amountCents: p.amountCents, memo: "carrier_payout_weekly", idempotencyKey: `payout-weekly:${p.id}` });
+    await prisma.payment.update({ where: { id: p.id }, data: { status: PaymentStatus.SETTLED, settledAt: new Date(), externalRef: po.externalRef } });
     const escrow = await prisma.escrowTransaction.findUnique({ where: { shipmentId: p.shipmentId } });
     if (escrow?.externalRef && escrow.state === EscrowState.RELEASED) {
       try {

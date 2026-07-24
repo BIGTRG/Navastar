@@ -41,6 +41,9 @@ const schema = z.object({
   OCR_API_KEY: z.string().optional().default(""),
 
   ESCROW_PROVIDER: z.enum(["stub"]).default("stub"),
+  // Payment processor (charges + payouts). Real vendor plugs in via env.
+  PAYMENT_PROVIDER: z.enum(["stub", "stripe"]).default("stub"),
+  STRIPE_SECRET_KEY: z.string().optional().default(""),
   EVENT_BUS: z.enum(["inprocess", "kafka"]).default("inprocess"),
   FMCSA_WEBKEY: z.string().optional().default(""),
 });
