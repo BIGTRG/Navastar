@@ -31,6 +31,14 @@ const schema = z.object({
 
   AI_PROVIDER: z.enum(["stub"]).default("stub"),
   AI_CONFIDENCE_THRESHOLD: z.coerce.number().min(0).max(1).default(0.75),
+  // Per-capability AI vendor selection (Module 15). Real vendors plug in here;
+  // `stub` keeps everything self-contained. Our own trained model = `navastar`.
+  AI_INSPECTION_PROVIDER: z.enum(["stub", "ravin", "proovstation", "navastar"]).default("stub"),
+  AI_OCR_PROVIDER: z.enum(["stub", "vendor"]).default("stub"),
+  // Vendor keys (optional; adapters fall back to stub scoring when absent).
+  RAVIN_API_KEY: z.string().optional().default(""),
+  PROOVSTATION_API_KEY: z.string().optional().default(""),
+  OCR_API_KEY: z.string().optional().default(""),
 
   ESCROW_PROVIDER: z.enum(["stub"]).default("stub"),
   EVENT_BUS: z.enum(["inprocess", "kafka"]).default("inprocess"),

@@ -27,6 +27,7 @@ import trustRoutes from "./routes/trust.js";
 import adminRoutes from "./routes/admin.js";
 import shippingRoutes from "./routes/shipping.js";
 import equipmentRoutes from "./routes/equipment.js";
+import aiRoutes from "./routes/ai.js";
 import { hub } from "./realtime.js";
 import { initPayments } from "./lib/payments.js";
 import { initWebhooks } from "./lib/webhooks.js";
@@ -101,6 +102,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Module 14 — multi-commodity shipping + equipment leasing marketplace.
   await app.register(shippingRoutes);
   await app.register(equipmentRoutes);
+  // Module 15 — deeper AI (support copilot, forecasting, fraud).
+  await app.register(aiRoutes);
 
   app.setErrorHandler((err, _req, reply) => {
     const status = (err as { statusCode?: number }).statusCode ?? 500;

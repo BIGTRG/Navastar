@@ -28,6 +28,7 @@ import { Monitoring } from "./components/Monitoring.js";
 import { Admin } from "./components/Admin.js";
 import { Equipment } from "./components/Equipment.js";
 import { ShipAnything } from "./components/ShipAnything.js";
+import { Copilot } from "./components/Copilot.js";
 
 // ─────────────────────────────────────────────────────────────
 // Root
@@ -35,7 +36,7 @@ import { ShipAnything } from "./components/ShipAnything.js";
 export function App() {
   const [user, setUser] = useState<LoginResponse["user"] | null>(null);
   const [tab, setTab] = useState<
-    | "deliver" | "track" | "driver" | "ops" | "qa" | "dispatch" | "loadboard" | "onboarding" | "pay" | "compliance" | "risk" | "admin" | "equipment"
+    | "deliver" | "track" | "driver" | "ops" | "qa" | "dispatch" | "loadboard" | "onboarding" | "pay" | "compliance" | "risk" | "admin" | "equipment" | "copilot"
   >("deliver");
 
   useEffect(() => {
@@ -133,6 +134,9 @@ export function App() {
                   Pay
                 </TabButton>
               )}
+              <TabButton active={tab === "copilot"} onClick={() => setTab("copilot")}>
+                Copilot
+              </TabButton>
             </div>
             {tab === "deliver" && (
               <>
@@ -176,6 +180,9 @@ export function App() {
             {tab === "admin" && <Admin />}
             {tab === "equipment" && (
               <Equipment canManage={user.roles.some((r) => r === "equipment_lessor" || r === "admin")} />
+            )}
+            {tab === "copilot" && (
+              <Copilot canForecast={user.roles.some((r) => r === "dispatcher" || r === "admin")} />
             )}
           </>
         )}

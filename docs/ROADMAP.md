@@ -31,7 +31,7 @@ for go. Legend: ✅ done · 🟡 in progress · ⬜ not started.
 
 ## Phase 4 — Expansion
 - ✅ **Module 14 — Multi-commodity + equipment leasing**: create draft shipments for ANY enabled commodity (boats/equipment/freight/white-glove/high-value/live-animals-when-on) with a handling profile — quote/book flow then applies; disabled commodities rejected by the rules engine. Equipment leasing marketplace: lessors list, carriers/operators lease (reserves the listing). Web Equipment tab + "Ship any commodity" card.
-- ⬜ Module 15 — Deeper AI (real vendors; train/swap our own inspection model)
+- ✅ **Module 15 — Deeper AI**: per-capability vendor routing via CompositeAIProvider (inspection → Ravin / ProovStation-UVeye / **our own model**; OCR → vendor; selected by env, zero-key fallback to stub) — real vendors drop in with no call-site changes. Support copilot endpoint (AI-first + human handoff), demand/revenue forecasting, on-demand fraud check; each AI call logged via runAi. Web Copilot tab (support chat + ops forecast).
 
 ## Deployment (self-hosted on Hetzner)
 - ⬜ `docker-compose.prod.yml` (web + api + postgres + minio + Caddy auto-HTTPS)
