@@ -385,7 +385,44 @@ model AuctionPartner {
   apiKey    String? // partner-scoped key for inbound API (hashed in prod)
   createdAt DateTime           @default(now())
 
-  lots AuctionLot[]
+  lots     AuctionLot[]
+  webhooks WebhookEndpoint[]
+}
+
+enum WebhookStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+// Partner-registered webhook endpoint (event push-back — "connected via API").
+model WebhookEndpoint {
+  id        String   @id @default(cuid())
+  partnerId String
+  partner   AuctionPartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  url       String
+  secret    String // HMAC signing secret
+  events    String[] // topics to deliver, e.g. ["shipment.status","shipment.booked"]
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  deliveries WebhookDelivery[]
+
+  @@index([partnerId])
+}
+
+model WebhookDelivery {
+  id           String        @id @default(cuid())
+  endpointId   String
+  endpoint     WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  event        String
+  payload      Json
+  status       WebhookStatus @default(PENDING)
+  responseCode Int?
+  attempts     Int           @default(0)
+  createdAt    DateTime      @default(now())
+
+  @@index([endpointId])
 }
 
 model AuctionLot {

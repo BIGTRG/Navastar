@@ -2,7 +2,10 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
+import swagger from "@fastify/swagger";
+import swaggerUi from "@fastify/swagger-ui";
 import authPlugin from "./plugins/auth.js";
+import partnerPlugin from "./plugins/partner.js";
 import healthRoutes from "./routes/health.js";
 import authRoutes from "./routes/auth.js";
 import auctionRoutes from "./routes/auction.js";
@@ -18,8 +21,10 @@ import dispatchRoutes from "./routes/dispatch.js";
 import loadboardRoutes from "./routes/loadboard.js";
 import onboardingRoutes from "./routes/onboarding.js";
 import paymentRoutes from "./routes/payments.js";
+import partnerRoutes from "./routes/partner.js";
 import { hub } from "./realtime.js";
 import { initPayments } from "./lib/payments.js";
+import { initWebhooks } from "./lib/webhooks.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -28,12 +33,33 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   await app.register(cors, { origin: true, credentials: true });
   await app.register(websocket);
+
+  // OpenAPI (served at /api/openapi.json) + interactive docs at /api/docs.
+  await app.register(swagger, {
+    openapi: {
+      info: { title: "Navastar Logistics API", version: "0.1.0", description: "Public + partner API for the Navastar platform." },
+      tags: [
+        { name: "partner", description: "Partner (API-key) endpoints" },
+        { name: "public", description: "Public endpoints" },
+      ],
+      components: {
+        securitySchemes: { apiKey: { type: "apiKey", name: "x-api-key", in: "header" } },
+      },
+    },
+  });
+  await app.register(swaggerUi, { routePrefix: "/api/docs" });
+  // Machine-readable spec (swagger-ui also serves it at /api/docs/json).
+  app.get("/api/openapi.json", async () => app.swagger());
+
   await app.register(authPlugin);
+  await app.register(partnerPlugin);
 
   // Bridge the event bus to live WebSocket subscribers.
   hub.start();
   // Wire payment side-effects (fee-on-booking, escrow-release-on-POD).
   initPayments();
+  // Wire outbound webhook delivery to partner endpoints.
+  initWebhooks();
 
   // Public + Module 1 routes.
   await app.register(healthRoutes);
@@ -59,6 +85,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(onboardingRoutes);
   // Module 9 — payments, settlement & escrow.
   await app.register(paymentRoutes);
+  // Module 10 — public/partner API + webhooks + widget.
+  await app.register(partnerRoutes);
 
   app.setErrorHandler((err, _req, reply) => {
     const status = (err as { statusCode?: number }).statusCode ?? 500;

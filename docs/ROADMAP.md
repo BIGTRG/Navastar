@@ -24,7 +24,7 @@ for go. Legend: ✅ done · 🟡 in progress · ⬜ not started.
 - ✅ **Module 9 — Payments, settlement & escrow**: fee collected UP FRONT at booking (event-driven) opening escrow FEE_COLLECTED→FUNDS_HELD; POD/BOL sign-off (pod.signed) fires BOL_SIGNED→RELEASED + creates a payout; standard payout WEEKLY & FREE (settle-weekly) vs opt-in quick-pay (instant, fee — both drivers & carriers, its own revenue stream); EscrowConnector stub drives the state machine. Drivers/carriers see only their own net pay. Web Pay tab (my payouts + quick-pay, weekly settlement).
 
 ## Phase 3 — Platform & partners
-- ⬜ Module 10 — Public/Partner API + webhooks + OpenAPI + sandbox + widget/SDK
+- ✅ **Module 10 — Public/Partner API + webhooks + OpenAPI + widget**: partner API-key auth (x-api-key → AuctionPartner); partner endpoints to import lots + track + register webhooks; HMAC-signed webhook delivery on subscribed bus events (WebhookEndpoint/WebhookDelivery); OpenAPI 3 spec at `/api/openapi.json` + interactive docs at `/api/docs`; embeddable "Deliver with Navastar" widget served at `/api/widget.js`.
 - ⬜ Module 11 — Custody & compliance service (commodity rules engine)
 - ⬜ Module 12 — Ratings & trust; Insurance & claims; Carrier-monitoring (separate from GPS)
 - ⬜ Module 13 — Revenue & Monetization admin backboard (6 streams + commodity toggles)
