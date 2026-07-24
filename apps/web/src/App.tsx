@@ -22,6 +22,7 @@ import { QAConsole } from "./components/QAConsole.js";
 import { DispatchBoard } from "./components/DispatchBoard.js";
 import { LoadBoard } from "./components/LoadBoard.js";
 import { Onboarding } from "./components/Onboarding.js";
+import { Payments } from "./components/Payments.js";
 
 // ─────────────────────────────────────────────────────────────
 // Root
@@ -29,7 +30,7 @@ import { Onboarding } from "./components/Onboarding.js";
 export function App() {
   const [user, setUser] = useState<LoginResponse["user"] | null>(null);
   const [tab, setTab] = useState<
-    "deliver" | "track" | "driver" | "ops" | "qa" | "dispatch" | "loadboard" | "onboarding"
+    "deliver" | "track" | "driver" | "ops" | "qa" | "dispatch" | "loadboard" | "onboarding" | "pay"
   >("deliver");
 
   useEffect(() => {
@@ -98,6 +99,13 @@ export function App() {
                   Onboarding
                 </TabButton>
               )}
+              {user.roles.some((r) =>
+                ["independent_carrier", "lease_operator", "employee_driver", "dispatcher", "admin"].includes(r)
+              ) && (
+                <TabButton active={tab === "pay"} onClick={() => setTab("pay")}>
+                  Pay
+                </TabButton>
+              )}
             </div>
             {tab === "deliver" && <DeliverWizard />}
             {tab === "track" && (
@@ -118,6 +126,14 @@ export function App() {
                   ["independent_carrier", "lease_operator", "employee_driver", "dispatcher", "admin"].includes(r)
                 )}
                 canManage={user.roles.some((r) => r === "dispatcher" || r === "admin")}
+              />
+            )}
+            {tab === "pay" && (
+              <Payments
+                canViewOwn={user.roles.some((r) =>
+                  ["independent_carrier", "lease_operator", "employee_driver", "dispatcher", "admin"].includes(r)
+                )}
+                canSettle={user.roles.some((r) => r === "admin" || r === "dispatcher")}
               />
             )}
             {tab === "qa" && <QAConsole />}

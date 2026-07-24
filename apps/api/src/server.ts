@@ -17,7 +17,9 @@ import qaRoutes from "./routes/qa.js";
 import dispatchRoutes from "./routes/dispatch.js";
 import loadboardRoutes from "./routes/loadboard.js";
 import onboardingRoutes from "./routes/onboarding.js";
+import paymentRoutes from "./routes/payments.js";
 import { hub } from "./realtime.js";
+import { initPayments } from "./lib/payments.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -30,6 +32,8 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Bridge the event bus to live WebSocket subscribers.
   hub.start();
+  // Wire payment side-effects (fee-on-booking, escrow-release-on-POD).
+  initPayments();
 
   // Public + Module 1 routes.
   await app.register(healthRoutes);
@@ -53,6 +57,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(loadboardRoutes);
   // Module 8 — carrier & driver onboarding (dual track, FMCSA, verify).
   await app.register(onboardingRoutes);
+  // Module 9 — payments, settlement & escrow.
+  await app.register(paymentRoutes);
 
   app.setErrorHandler((err, _req, reply) => {
     const status = (err as { statusCode?: number }).statusCode ?? 500;

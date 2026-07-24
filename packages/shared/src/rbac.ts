@@ -33,6 +33,10 @@ export const Permission = {
   // onboarding
   ONBOARD_SUBMIT: "onboarding:submit",
   ONBOARD_MANAGE: "onboarding:manage",
+  // payments
+  PAYMENTS_VIEW: "payments:view",
+  PAYOUT_VIEW_OWN: "payout:view_own",
+  PAYMENTS_SETTLE: "payments:settle",
   // qa
   QA_REVIEW: "qa:review",
   // admin / revenue
@@ -65,6 +69,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.LOAD_BOARD_VIEW,
     P.LOAD_BID,
     P.ONBOARD_SUBMIT,
+    P.PAYOUT_VIEW_OWN,
   ],
   [Role.employee_driver]: [
     P.DRIVER_JOBS_READ,
@@ -73,6 +78,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.MEDIA_UPLOAD,
     P.SHIPMENT_TRACK,
     P.ONBOARD_SUBMIT,
+    P.PAYOUT_VIEW_OWN,
   ],
   [Role.lease_operator]: [
     P.DRIVER_JOBS_READ,
@@ -83,6 +89,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.LOAD_BOARD_VIEW,
     P.LOAD_BID,
     P.ONBOARD_SUBMIT,
+    P.PAYOUT_VIEW_OWN,
   ],
   [Role.dispatcher]: [
     P.SHIPMENT_READ_ALL,
@@ -99,6 +106,8 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.LOAD_POST,
     P.ONBOARD_SUBMIT,
     P.ONBOARD_MANAGE,
+    P.PAYMENTS_VIEW,
+    P.PAYMENTS_SETTLE,
   ],
   [Role.qa_reviewer]: [P.QA_REVIEW, P.SHIPMENT_READ_ALL, P.SHIPMENT_TRACK],
   [Role.equipment_lessor]: [P.SHIPMENT_TRACK],

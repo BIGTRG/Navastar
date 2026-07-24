@@ -323,6 +323,19 @@ export interface PendingOnboarding {
   drivers: Array<{ id: string; name: string; type: string; onboardingStatus: string; backgroundCheckStatus: string | null }>;
 }
 
+// ── Module 9 — payments ──
+export interface PayoutRow {
+  id: string;
+  trackingId: string | null;
+  grossCents: number;
+  feeCents: number;
+  netCents: number;
+  method: string;
+  status: string;
+  quickPay: boolean;
+  settledAt: string | null;
+}
+
 export function opsSocketUrl(): string {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   return `${proto}://${location.host}/ws/ops?token=${getToken() ?? ""}`;
