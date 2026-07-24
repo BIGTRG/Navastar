@@ -105,5 +105,20 @@ Sign in as `driver@demo.navastar` → **Driver app** tab → open a job:
 | POST | `/api/shipments/:id/pickup` | `inspection:submit` | complete pickup |
 | POST | `/api/shipments/:id/pod` | `pod:submit` | signature + photo POD → Delivered |
 
+### Try the Ops dashboard (Module 4)
+Sign in as `dispatch@demo.navastar` → **Ops** tab: KPI cards (GMV, revenue, blended take
+rate, needs-review…), a filterable **shipments table** (margin column visible to
+dispatch/admin), the **exceptions / human-review queue**, and the **Global GPS map** of
+active drivers (fleet = blue, contractor = red). Click **▶** on a driver in the roster to
+roam them — the dot moves live over the ops WebSocket.
+
+| Method | Path | Permission | Purpose |
+|---|---|---|---|
+| GET | `/api/ops/kpis` | `ops_dashboard:read` | operation KPIs |
+| GET | `/api/ops/shipments` | `ops_dashboard:read` | filterable shipments table |
+| GET | `/api/ops/drivers` | `ops_dashboard:read` | fleet roster (+ positions) |
+| GET | `/api/ops/exceptions` | `ops_dashboard:read` | exceptions + review queue |
+| WS | `/ws/ops?token=` | valid JWT | live `driver.location` stream |
+
 Deployment to a self-hosted Hetzner server (Caddy auto-HTTPS, nightly backups,
 one-command deploy) is added in the deployment phase — see the roadmap.

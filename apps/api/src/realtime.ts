@@ -10,6 +10,8 @@ export interface RealtimeClient {
 }
 
 const LIVE_TOPICS = new Set(["tracking.point", "shipment.status"]);
+// Global room key for fleet-wide events (ops Global GPS map).
+export const OPS_ROOM = "ops";
 
 class RealtimeHub {
   private rooms = new Map<string, Set<RealtimeClient>>();
@@ -20,6 +22,12 @@ class RealtimeHub {
     if (this.started) return;
     this.started = true;
     bus.on("*", (evt: DomainEvent) => {
+      // Fleet-wide driver positions → the ops room.
+      if (evt.topic === "driver.location") {
+        this.publish(OPS_ROOM, { type: evt.topic, ...evt.payload });
+        return;
+      }
+      // Per-shipment live events → that shipment's room.
       if (!LIVE_TOPICS.has(evt.topic)) return;
       const shipmentId = evt.payload.shipmentId as string | undefined;
       if (!shipmentId) return;

@@ -12,6 +12,7 @@ import connectorRoutes from "./routes/connectors.js";
 import trackingRoutes from "./routes/tracking.js";
 import uploadRoutes from "./routes/uploads.js";
 import driverRoutes from "./routes/driver.js";
+import opsRoutes from "./routes/ops.js";
 import { hub } from "./realtime.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -38,6 +39,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Module 3 — driver app (media + guided pickup + inspection + POD).
   await app.register(uploadRoutes);
   await app.register(driverRoutes);
+  // Module 4 — ops dashboard (KPIs, shipments, exceptions, Global GPS map).
+  await app.register(opsRoutes);
 
   app.setErrorHandler((err, _req, reply) => {
     const status = (err as { statusCode?: number }).statusCode ?? 500;

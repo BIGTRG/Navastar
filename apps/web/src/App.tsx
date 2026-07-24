@@ -17,13 +17,14 @@ import {
 } from "./api.js";
 import { LiveMap } from "./components/LiveMap.js";
 import { DriverApp } from "./components/DriverApp.js";
+import { OpsDashboard } from "./components/OpsDashboard.js";
 
 // ─────────────────────────────────────────────────────────────
 // Root
 // ─────────────────────────────────────────────────────────────
 export function App() {
   const [user, setUser] = useState<LoginResponse["user"] | null>(null);
-  const [tab, setTab] = useState<"deliver" | "track" | "driver">("deliver");
+  const [tab, setTab] = useState<"deliver" | "track" | "driver" | "ops">("deliver");
 
   useEffect(() => {
     if (getToken()) {
@@ -62,12 +63,18 @@ export function App() {
                   Driver app
                 </TabButton>
               )}
+              {user.roles.some((r) => r === "dispatcher" || r === "admin") && (
+                <TabButton active={tab === "ops"} onClick={() => setTab("ops")}>
+                  Ops
+                </TabButton>
+              )}
             </div>
             {tab === "deliver" && <DeliverWizard />}
             {tab === "track" && (
               <TrackPanel canDispatch={user.roles.some((r) => r === "dispatcher" || r === "admin")} />
             )}
             {tab === "driver" && <DriverApp />}
+            {tab === "ops" && <OpsDashboard />}
           </>
         )}
       </main>

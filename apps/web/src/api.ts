@@ -163,6 +163,60 @@ export async function uploadMedia(shipmentId: string, kind: string, file: File |
   return presigned.key;
 }
 
+// ── Module 4 — ops ──
+export interface OpsKpis {
+  activeShipments: number;
+  delivered: number;
+  exceptions: number;
+  pendingReview: number;
+  driversActive: number;
+  gmvCents: number;
+  revenueCents: number;
+  blendedTakeRateBps: number;
+  avgAiConfidence: number | null;
+}
+export interface OpsShipmentRow {
+  id: string;
+  trackingId: string;
+  status: string;
+  commodityType: string;
+  quotedPriceCents: number | null;
+  marginCents?: number;
+  origin: string | null;
+  dest: string | null;
+  createdAt: string;
+}
+export interface FleetDriver {
+  id: string;
+  name: string;
+  type: string;
+  kind: "fleet" | "contractor";
+  carrier: string;
+  lat: number | null;
+  lng: number | null;
+  lastSeenAt: string | null;
+  roaming: boolean;
+}
+export interface OpsException {
+  type: "status_exception" | "needs_human_review";
+  shipmentId: string | null;
+  trackingId: string | null;
+  detail: string;
+  at: string;
+}
+export interface OpsLiveMessage {
+  type: "connected" | "driver.location";
+  driverId?: string;
+  lat?: number;
+  lng?: number;
+  name?: string;
+}
+
+export function opsSocketUrl(): string {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  return `${proto}://${location.host}/ws/ops?token=${getToken() ?? ""}`;
+}
+
 export function formatUSD(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 }
