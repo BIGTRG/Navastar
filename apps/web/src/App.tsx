@@ -19,13 +19,14 @@ import { LiveMap } from "./components/LiveMap.js";
 import { DriverApp } from "./components/DriverApp.js";
 import { OpsDashboard } from "./components/OpsDashboard.js";
 import { QAConsole } from "./components/QAConsole.js";
+import { DispatchBoard } from "./components/DispatchBoard.js";
 
 // ─────────────────────────────────────────────────────────────
 // Root
 // ─────────────────────────────────────────────────────────────
 export function App() {
   const [user, setUser] = useState<LoginResponse["user"] | null>(null);
-  const [tab, setTab] = useState<"deliver" | "track" | "driver" | "ops" | "qa">("deliver");
+  const [tab, setTab] = useState<"deliver" | "track" | "driver" | "ops" | "qa" | "dispatch">("deliver");
 
   useEffect(() => {
     if (getToken()) {
@@ -69,6 +70,11 @@ export function App() {
                   Ops
                 </TabButton>
               )}
+              {user.roles.some((r) => r === "dispatcher" || r === "admin") && (
+                <TabButton active={tab === "dispatch"} onClick={() => setTab("dispatch")}>
+                  Dispatch
+                </TabButton>
+              )}
               {user.roles.some((r) => r === "qa_reviewer" || r === "admin") && (
                 <TabButton active={tab === "qa"} onClick={() => setTab("qa")}>
                   QA
@@ -81,6 +87,7 @@ export function App() {
             )}
             {tab === "driver" && <DriverApp />}
             {tab === "ops" && <OpsDashboard />}
+            {tab === "dispatch" && <DispatchBoard />}
             {tab === "qa" && <QAConsole />}
           </>
         )}

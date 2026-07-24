@@ -134,5 +134,19 @@ score** (see the Reliability tab). This closes the AI → human-approve → QA-v
 | POST | `/api/qa/inspections/:id/decision` | `qa:review` | Pass/Fix/Fail → reliability |
 | GET | `/api/qa/reliability` | `qa:review` | driver trust scores + pass rates |
 
+### Try Dispatch & matching (Module 6, Phase 2)
+Sign in as `dispatch@demo.navastar` → **Dispatch** tab. Booked-but-unassigned shipments
+appear in the queue; open one to run the **matching engine** — it ranks active drivers on
+**capability · proximity · economics · trust** (shown as factor bars), logged as an AI
+MATCHING decision with a confidence badge. **Auto-assign best** or **Assign** a specific
+driver → a Leg is created with the driver's payout (margin stays hidden) and the shipment
+advances to ASSIGNED.
+
+| Method | Path | Permission | Purpose |
+|---|---|---|---|
+| GET | `/api/dispatch/queue` | `dispatch:assign` | shipments needing a driver |
+| POST | `/api/dispatch/shipments/:id/match` | `dispatch:assign` | ranked candidates (AI-logged) |
+| POST | `/api/dispatch/shipments/:id/assign` | `dispatch:assign` | auto/manual assign → Leg |
+
 Deployment to a self-hosted Hetzner server (Caddy auto-HTTPS, nightly backups,
 one-command deploy) is added in the deployment phase — see the roadmap.
