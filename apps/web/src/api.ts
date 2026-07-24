@@ -16,6 +16,13 @@ export class ApiError extends Error {
   }
 }
 
+// P1 #9 — on any 401 (expired/invalid token), the client clears the token and
+// notifies the app so it can drop the session and send the user back to login.
+let unauthorizedHandler: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  unauthorizedHandler = fn;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const token = getToken();
@@ -28,6 +35,11 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const text = await res.text();
   const json = text ? JSON.parse(text) : null;
   if (!res.ok) {
+    // Expired/invalid session → clear it and notify the app (except on login).
+    if (res.status === 401 && !path.endsWith("/auth/login")) {
+      setToken(null);
+      unauthorizedHandler?.();
+    }
     throw new ApiError(res.status, (json && (json.message || json.error)) || res.statusText, json);
   }
   return json as T;

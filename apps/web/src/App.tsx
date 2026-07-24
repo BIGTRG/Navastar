@@ -4,6 +4,7 @@ import {
   ApiError,
   setToken,
   getToken,
+  setUnauthorizedHandler,
   formatUSD,
   liveSocketUrl,
   type LoginResponse,
@@ -40,12 +41,19 @@ export function App() {
   >("deliver");
 
   useEffect(() => {
+    // Any 401 from the API clears the session and returns to the login screen.
+    setUnauthorizedHandler(() => {
+      setToken(null);
+      setUser(null);
+      setTab("deliver");
+    });
     if (getToken()) {
       api.get<{ user: LoginResponse["user"] }>("/api/auth/me").then(
         (r) => setUser(r.user),
         () => setToken(null)
       );
     }
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   return (
