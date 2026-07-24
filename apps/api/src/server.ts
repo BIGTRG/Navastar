@@ -24,6 +24,7 @@ import paymentRoutes from "./routes/payments.js";
 import partnerRoutes from "./routes/partner.js";
 import complianceRoutes from "./routes/compliance.js";
 import trustRoutes from "./routes/trust.js";
+import adminRoutes from "./routes/admin.js";
 import { hub } from "./realtime.js";
 import { initPayments } from "./lib/payments.js";
 import { initWebhooks } from "./lib/webhooks.js";
@@ -93,6 +94,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(complianceRoutes);
   // Module 12 — ratings & trust, insurance & claims, carrier-monitoring.
   await app.register(trustRoutes);
+  // Module 13 — revenue & monetization admin backboard.
+  await app.register(adminRoutes);
 
   app.setErrorHandler((err, _req, reply) => {
     const status = (err as { statusCode?: number }).statusCode ?? 500;

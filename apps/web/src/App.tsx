@@ -25,6 +25,7 @@ import { Onboarding } from "./components/Onboarding.js";
 import { Payments } from "./components/Payments.js";
 import { Compliance } from "./components/Compliance.js";
 import { Monitoring } from "./components/Monitoring.js";
+import { Admin } from "./components/Admin.js";
 
 // ─────────────────────────────────────────────────────────────
 // Root
@@ -32,7 +33,7 @@ import { Monitoring } from "./components/Monitoring.js";
 export function App() {
   const [user, setUser] = useState<LoginResponse["user"] | null>(null);
   const [tab, setTab] = useState<
-    | "deliver" | "track" | "driver" | "ops" | "qa" | "dispatch" | "loadboard" | "onboarding" | "pay" | "compliance" | "risk"
+    | "deliver" | "track" | "driver" | "ops" | "qa" | "dispatch" | "loadboard" | "onboarding" | "pay" | "compliance" | "risk" | "admin"
   >("deliver");
 
   useEffect(() => {
@@ -97,6 +98,11 @@ export function App() {
                   Trust &amp; Risk
                 </TabButton>
               )}
+              {user.roles.includes("admin") && (
+                <TabButton active={tab === "admin"} onClick={() => setTab("admin")}>
+                  Revenue admin
+                </TabButton>
+              )}
               {user.roles.some((r) =>
                 ["independent_carrier", "lease_operator", "dispatcher", "admin"].includes(r)
               ) && (
@@ -153,6 +159,7 @@ export function App() {
             {tab === "risk" && (
               <Monitoring canManageClaims={user.roles.some((r) => r === "dispatcher" || r === "admin")} />
             )}
+            {tab === "admin" && <Admin />}
           </>
         )}
       </main>

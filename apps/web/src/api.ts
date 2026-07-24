@@ -358,6 +358,34 @@ export interface ClaimRow {
   createdAt: string;
 }
 
+// ── Module 13 — revenue admin ──
+export interface RevenueConfigResponse {
+  config: {
+    subFreePriceCents: number;
+    subProPriceCents: number;
+    subFleetPriceCents: number;
+    quickPayFeeBps: number;
+    loadBoardConnectionFeeCents: number;
+    escrowFeeBps: number;
+    valueAddPricing: unknown;
+  };
+  commodities: Array<{ type: string; label: string; enabled: boolean; marginBps: number }>;
+}
+export interface RevenueDashboard {
+  gmvCents: number;
+  streams: {
+    margin: number;
+    subscriptionMrr: number;
+    quickPayFees: number;
+    loadBoardConnectionFees: number;
+    escrowAssuranceFees: number;
+    valueAdd: number;
+  };
+  mrrCents: number;
+  transactionalRevenueCents: number;
+  blendedTakeRateBps: number;
+}
+
 export function opsSocketUrl(): string {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   return `${proto}://${location.host}/ws/ops?token=${getToken() ?? ""}`;
