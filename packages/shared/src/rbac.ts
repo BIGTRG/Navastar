@@ -45,6 +45,10 @@ export const Permission = {
   CLAIM_MANAGE: "claim:manage",
   INSURANCE_MANAGE: "insurance:manage",
   MONITORING_VIEW: "monitoring:view",
+  // multi-commodity + equipment marketplace
+  SHIPMENT_CREATE: "shipment:create",
+  EQUIPMENT_MANAGE: "equipment:manage",
+  EQUIPMENT_LEASE: "equipment:lease",
   // qa
   QA_REVIEW: "qa:review",
   // admin / revenue
@@ -68,6 +72,8 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.SHIPMENT_TRACK,
     P.RATING_SUBMIT,
     P.CLAIM_FILE,
+    P.SHIPMENT_CREATE,
+    P.EQUIPMENT_LEASE,
   ],
   [Role.auction_partner]: [P.AUCTION_LOT_CREATE, P.QUOTE_CREATE, P.SHIPMENT_BOOK, P.SHIPMENT_TRACK],
   [Role.independent_carrier]: [
@@ -80,6 +86,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.LOAD_BID,
     P.ONBOARD_SUBMIT,
     P.PAYOUT_VIEW_OWN,
+    P.EQUIPMENT_LEASE,
   ],
   [Role.employee_driver]: [
     P.DRIVER_JOBS_READ,
@@ -100,6 +107,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.LOAD_BID,
     P.ONBOARD_SUBMIT,
     P.PAYOUT_VIEW_OWN,
+    P.EQUIPMENT_LEASE,
   ],
   [Role.dispatcher]: [
     P.SHIPMENT_READ_ALL,
@@ -124,9 +132,11 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.CLAIM_MANAGE,
     P.INSURANCE_MANAGE,
     P.MONITORING_VIEW,
+    P.SHIPMENT_CREATE,
+    P.EQUIPMENT_LEASE,
   ],
   [Role.qa_reviewer]: [P.QA_REVIEW, P.SHIPMENT_READ_ALL, P.SHIPMENT_TRACK, P.COMPLIANCE_VIEW, P.MONITORING_VIEW],
-  [Role.equipment_lessor]: [P.SHIPMENT_TRACK],
+  [Role.equipment_lessor]: [P.SHIPMENT_TRACK, P.EQUIPMENT_MANAGE, P.EQUIPMENT_LEASE],
   [Role.admin]: [P.ADMIN_ALL], // expanded to all permissions by hasPermission()
 };
 

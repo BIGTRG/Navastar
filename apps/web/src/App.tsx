@@ -26,6 +26,8 @@ import { Payments } from "./components/Payments.js";
 import { Compliance } from "./components/Compliance.js";
 import { Monitoring } from "./components/Monitoring.js";
 import { Admin } from "./components/Admin.js";
+import { Equipment } from "./components/Equipment.js";
+import { ShipAnything } from "./components/ShipAnything.js";
 
 // ─────────────────────────────────────────────────────────────
 // Root
@@ -33,7 +35,7 @@ import { Admin } from "./components/Admin.js";
 export function App() {
   const [user, setUser] = useState<LoginResponse["user"] | null>(null);
   const [tab, setTab] = useState<
-    | "deliver" | "track" | "driver" | "ops" | "qa" | "dispatch" | "loadboard" | "onboarding" | "pay" | "compliance" | "risk" | "admin"
+    | "deliver" | "track" | "driver" | "ops" | "qa" | "dispatch" | "loadboard" | "onboarding" | "pay" | "compliance" | "risk" | "admin" | "equipment"
   >("deliver");
 
   useEffect(() => {
@@ -104,6 +106,13 @@ export function App() {
                 </TabButton>
               )}
               {user.roles.some((r) =>
+                ["equipment_lessor", "independent_carrier", "lease_operator", "dispatcher", "admin"].includes(r)
+              ) && (
+                <TabButton active={tab === "equipment"} onClick={() => setTab("equipment")}>
+                  Equipment
+                </TabButton>
+              )}
+              {user.roles.some((r) =>
                 ["independent_carrier", "lease_operator", "dispatcher", "admin"].includes(r)
               ) && (
                 <TabButton active={tab === "loadboard"} onClick={() => setTab("loadboard")}>
@@ -125,7 +134,12 @@ export function App() {
                 </TabButton>
               )}
             </div>
-            {tab === "deliver" && <DeliverWizard />}
+            {tab === "deliver" && (
+              <>
+                <DeliverWizard />
+                <ShipAnything />
+              </>
+            )}
             {tab === "track" && (
               <TrackPanel canDispatch={user.roles.some((r) => r === "dispatcher" || r === "admin")} />
             )}
@@ -160,6 +174,9 @@ export function App() {
               <Monitoring canManageClaims={user.roles.some((r) => r === "dispatcher" || r === "admin")} />
             )}
             {tab === "admin" && <Admin />}
+            {tab === "equipment" && (
+              <Equipment canManage={user.roles.some((r) => r === "equipment_lessor" || r === "admin")} />
+            )}
           </>
         )}
       </main>

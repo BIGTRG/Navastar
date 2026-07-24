@@ -386,6 +386,24 @@ export interface RevenueDashboard {
   blendedTakeRateBps: number;
 }
 
+// ── Module 14 — equipment / multi-commodity ──
+export interface EquipmentListingRow {
+  id: string;
+  title: string;
+  assetType: string;
+  description?: string | null;
+  dailyRateCents: number;
+  location?: string | null;
+}
+export interface MyLeaseRow {
+  id: string;
+  title: string;
+  rateCents: number;
+  status: string;
+  startAt: string | null;
+  endAt: string | null;
+}
+
 export function opsSocketUrl(): string {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   return `${proto}://${location.host}/ws/ops?token=${getToken() ?? ""}`;

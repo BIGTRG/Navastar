@@ -30,7 +30,7 @@ for go. Legend: ✅ done · 🟡 in progress · ⬜ not started.
 - ✅ **Module 13 — Revenue & Monetization admin backboard**: one control panel for all SIX streams (margin % per commodity, subscription tier prices, quick-pay fee %, load-board connection fee, escrow/assurance fee %, value-add), every lever DB-backed via RevenueConfig (no redeploy); commodity on/off toggles (Live Animals OFF until flipped). Live dashboard: GMV, revenue by stream, MRR, blended take rate. Web Revenue admin tab (admin only).
 
 ## Phase 4 — Expansion
-- ⬜ Module 14 — Multi-commodity handling profiles + equipment leasing marketplace
+- ✅ **Module 14 — Multi-commodity + equipment leasing**: create draft shipments for ANY enabled commodity (boats/equipment/freight/white-glove/high-value/live-animals-when-on) with a handling profile — quote/book flow then applies; disabled commodities rejected by the rules engine. Equipment leasing marketplace: lessors list, carriers/operators lease (reserves the listing). Web Equipment tab + "Ship any commodity" card.
 - ⬜ Module 15 — Deeper AI (real vendors; train/swap our own inspection model)
 
 ## Deployment (self-hosted on Hetzner)
