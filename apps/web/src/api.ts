@@ -253,6 +253,36 @@ export interface QaReliabilityRow {
   passRate: number | null;
 }
 
+// ── Module 6 — dispatch ──
+export interface DispatchQueueItem {
+  id: string;
+  trackingId: string;
+  commodityType: string;
+  cargo: string | null;
+  origin: string | null;
+  dest: string | null;
+  etaAt: string | null;
+}
+export interface MatchCandidate {
+  driverId: string;
+  name: string;
+  type: string;
+  carrier: string | null;
+  kind: "fleet" | "contractor";
+  proximityMiles: number | null;
+  payoutCents: number | null;
+  score: number;
+  factors: { capability: number; proximity: number; economics: number; trust: number };
+  reason: string;
+  eligible: boolean;
+}
+export interface MatchResponse {
+  shipmentId: string;
+  payoutCents: number | null;
+  candidates: MatchCandidate[];
+  ai: { model: string; version: string; confidence: number; needsHumanReview: boolean; decidedBy: string };
+}
+
 export function opsSocketUrl(): string {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   return `${proto}://${location.host}/ws/ops?token=${getToken() ?? ""}`;

@@ -18,7 +18,7 @@ for go. Legend: ✅ done · 🟡 in progress · ⬜ not started.
 - ✅ **Module 5 — QA console**: review queue (driver-approved inspections pending QA) showing AI findings (with source), the verified hash-chained custody chain, and POD/photos; Pass/Fix/Fail writes a QAReview + sets qaStatus on inspection & AIDecision; decisions feed driver/carrier reliability (trust) scores. Reliability leaderboard with pass rates. **Completes the AI → human-approve → QA-verify loop and closes Phase 1.**
 
 ## Phase 2 — Brokerage & network
-- ⬜ Module 6 — Dispatch & matching engine
+- ✅ **Module 6 — Dispatch & matching engine**: scores active drivers on capability + proximity (MapProvider) + economics (payout − deadhead) + trust (driver+carrier), ranks eligible-first, logged as an AI MATCHING decision with confidence. Auto-assign best or dispatcher-choose; assignment creates a Leg with driver payout (margin hidden), advances to ASSIGNED with custody event + live/outbox events. Web Dispatch board with factor bars.
 - ⬜ Module 7 — Load board
 - ⬜ Module 8 — Carrier & driver onboarding (W-2 + independent/lease-on; FMCSA auto-fill)
 - ⬜ Module 9 — Payments, settlement & pay models (escrow, quick-pay)
