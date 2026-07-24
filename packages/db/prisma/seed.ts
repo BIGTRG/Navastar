@@ -10,6 +10,8 @@ import {
   CarrierKind,
   DriverType,
   AssetType,
+  SubscriptionTier,
+  SubscriptionStatus,
 } from "../src/index.js";
 
 const DEMO_PASSWORD = "password123"; // demo only — see docs/BRIEF for prod auth
@@ -99,7 +101,7 @@ async function main() {
   // ── A carrier with drivers + assets ──
   const carrier = await prisma.carrier.upsert({
     where: { dotNumber: "1234567" },
-    update: {},
+    update: { ownerUserId: userByEmail["carrier@demo.navastar"] },
     create: {
       kind: CarrierKind.INDEPENDENT,
       legalName: "Roadrunner Transport LLC",
@@ -109,8 +111,19 @@ async function main() {
       authorityActive: true,
       safetyScore: 88,
       trustScore: 82,
+      ownerUserId: userByEmail["carrier@demo.navastar"],
     },
   });
+
+  // Give the demo carrier an active PRO subscription so it can use the load board.
+  if ((await prisma.subscription.count({ where: { carrierId: carrier.id } })) === 0) {
+    await prisma.subscription.create({
+      data: { carrierId: carrier.id, tier: SubscriptionTier.PRO, status: SubscriptionStatus.ACTIVE, priceCents: 9900 },
+    });
+  }
+
+  // Single-row revenue config (all six streams; admin backboard edits this later).
+  await prisma.revenueConfig.upsert({ where: { id: "revenue" }, update: {}, create: { id: "revenue" } });
 
   const employeeDriver = await prisma.driver.upsert({
     where: { userId: userByEmail["driver@demo.navastar"] },

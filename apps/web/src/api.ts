@@ -283,6 +283,33 @@ export interface MatchResponse {
   ai: { model: string; version: string; confidence: number; needsHumanReview: boolean; decidedBy: string };
 }
 
+// ── Module 7 — load board ──
+export interface LoadPostRow {
+  id: string;
+  trackingId: string;
+  commodityType: string;
+  cargo: string | null;
+  origin: string | null;
+  dest: string | null;
+  targetPayoutCents: number | null;
+  minBidCents: number | null;
+  bidCount: number;
+  myBidCents: number | null;
+  notes: string | null;
+}
+export interface LoadBoardResponse {
+  needsSubscription: boolean;
+  subscription: { tier: string; status: string } | null;
+  posts: LoadPostRow[];
+}
+export interface LoadBidRow {
+  id: string;
+  amountCents: number;
+  status: string;
+  note: string | null;
+  carrier: { name: string; trust: number; safety: number | null; authorityActive: boolean } | null;
+}
+
 export function opsSocketUrl(): string {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   return `${proto}://${location.host}/ws/ops?token=${getToken() ?? ""}`;

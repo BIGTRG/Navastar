@@ -19,7 +19,7 @@ for go. Legend: ✅ done · 🟡 in progress · ⬜ not started.
 
 ## Phase 2 — Brokerage & network
 - ✅ **Module 6 — Dispatch & matching engine**: scores active drivers on capability + proximity (MapProvider) + economics (payout − deadhead) + trust (driver+carrier), ranks eligible-first, logged as an AI MATCHING decision with confidence. Auto-assign best or dispatcher-choose; assignment creates a Leg with driver payout (margin hidden), advances to ASSIGNED with custody event + live/outbox events. Web Dispatch board with factor bars.
-- ⬜ Module 7 — Load board
+- ✅ **Module 7 — Load board**: ops posts booked/unassigned shipments as overflow loads; vetted carriers with an **active subscription** browse + bid; ops views bids (carrier trust/safety/authority) and awards → assigns the load to the winning carrier and charges a **per-load connection fee** (Payment, inbound revenue). New models: LoadPost, Bid, Subscription, and **RevenueConfig** (single-row, DB-backed levers for all six streams — Module 13's admin backboard builds on it). Web Load board (carrier bid view + ops post/award view).
 - ⬜ Module 8 — Carrier & driver onboarding (W-2 + independent/lease-on; FMCSA auto-fill)
 - ⬜ Module 9 — Payments, settlement & pay models (escrow, quick-pay)
 

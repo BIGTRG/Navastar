@@ -148,5 +148,22 @@ advances to ASSIGNED.
 | POST | `/api/dispatch/shipments/:id/match` | `dispatch:assign` | ranked candidates (AI-logged) |
 | POST | `/api/dispatch/shipments/:id/assign` | `dispatch:assign` | auto/manual assign → Leg |
 
+### Try the Load board (Module 7)
+> Schema changed this module — run `pnpm db:push && pnpm db:seed` first.
+
+As `dispatch@demo.navastar` → **Load board**: post a booked shipment as an overflow load.
+As `carrier@demo.navastar` → **Load board**: browse open loads and **bid** (the demo carrier
+has an active PRO subscription; unsubscribed carriers see a paywall). Back as dispatch,
+**Award** a bid → the load is assigned to that carrier and a **per-load connection fee** is
+charged (inbound revenue).
+
+| Method | Path | Permission | Purpose |
+|---|---|---|---|
+| POST | `/api/loadboard/posts` | `load:post` | post an overflow load |
+| GET | `/api/loadboard/posts` | `load_board:view` | browse (subscription-gated) |
+| POST | `/api/loadboard/posts/:id/bids` | `load:bid` | bid (needs active subscription) |
+| POST | `/api/loadboard/bids/:id/award` | `load:post` | award → assign + connection fee |
+| POST | `/api/loadboard/subscribe` | `load_board:view` | subscribe / change tier |
+
 Deployment to a self-hosted Hetzner server (Caddy auto-HTTPS, nightly backups,
 one-command deploy) is added in the deployment phase — see the roadmap.

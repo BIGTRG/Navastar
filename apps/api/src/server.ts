@@ -15,6 +15,7 @@ import driverRoutes from "./routes/driver.js";
 import opsRoutes from "./routes/ops.js";
 import qaRoutes from "./routes/qa.js";
 import dispatchRoutes from "./routes/dispatch.js";
+import loadboardRoutes from "./routes/loadboard.js";
 import { hub } from "./realtime.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -47,6 +48,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(qaRoutes);
   // Module 6 — dispatch & matching (queue, AI match, auto/manual assign).
   await app.register(dispatchRoutes);
+  // Module 7 — load board (post, browse, bid, award, subscribe).
+  await app.register(loadboardRoutes);
 
   app.setErrorHandler((err, _req, reply) => {
     const status = (err as { statusCode?: number }).statusCode ?? 500;

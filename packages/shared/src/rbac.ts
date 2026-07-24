@@ -26,6 +26,10 @@ export const Permission = {
   // ops / dispatch
   OPS_DASHBOARD_READ: "ops_dashboard:read",
   DISPATCH_ASSIGN: "dispatch:assign",
+  // load board
+  LOAD_BOARD_VIEW: "load_board:view",
+  LOAD_BID: "load:bid",
+  LOAD_POST: "load:post",
   // qa
   QA_REVIEW: "qa:review",
   // admin / revenue
@@ -55,6 +59,8 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.POD_SUBMIT,
     P.MEDIA_UPLOAD,
     P.SHIPMENT_TRACK,
+    P.LOAD_BOARD_VIEW,
+    P.LOAD_BID,
   ],
   [Role.employee_driver]: [
     P.DRIVER_JOBS_READ,
@@ -69,6 +75,8 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.POD_SUBMIT,
     P.MEDIA_UPLOAD,
     P.SHIPMENT_TRACK,
+    P.LOAD_BOARD_VIEW,
+    P.LOAD_BID,
   ],
   [Role.dispatcher]: [
     P.SHIPMENT_READ_ALL,
@@ -81,6 +89,8 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.MEDIA_UPLOAD,
     P.INSPECTION_SUBMIT,
     P.POD_SUBMIT,
+    P.LOAD_BOARD_VIEW,
+    P.LOAD_POST,
   ],
   [Role.qa_reviewer]: [P.QA_REVIEW, P.SHIPMENT_READ_ALL, P.SHIPMENT_TRACK],
   [Role.equipment_lessor]: [P.SHIPMENT_TRACK],

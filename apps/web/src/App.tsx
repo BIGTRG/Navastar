@@ -20,13 +20,16 @@ import { DriverApp } from "./components/DriverApp.js";
 import { OpsDashboard } from "./components/OpsDashboard.js";
 import { QAConsole } from "./components/QAConsole.js";
 import { DispatchBoard } from "./components/DispatchBoard.js";
+import { LoadBoard } from "./components/LoadBoard.js";
 
 // ─────────────────────────────────────────────────────────────
 // Root
 // ─────────────────────────────────────────────────────────────
 export function App() {
   const [user, setUser] = useState<LoginResponse["user"] | null>(null);
-  const [tab, setTab] = useState<"deliver" | "track" | "driver" | "ops" | "qa" | "dispatch">("deliver");
+  const [tab, setTab] = useState<
+    "deliver" | "track" | "driver" | "ops" | "qa" | "dispatch" | "loadboard"
+  >("deliver");
 
   useEffect(() => {
     if (getToken()) {
@@ -80,6 +83,13 @@ export function App() {
                   QA
                 </TabButton>
               )}
+              {user.roles.some((r) =>
+                ["independent_carrier", "lease_operator", "dispatcher", "admin"].includes(r)
+              ) && (
+                <TabButton active={tab === "loadboard"} onClick={() => setTab("loadboard")}>
+                  Load board
+                </TabButton>
+              )}
             </div>
             {tab === "deliver" && <DeliverWizard />}
             {tab === "track" && (
@@ -88,6 +98,12 @@ export function App() {
             {tab === "driver" && <DriverApp />}
             {tab === "ops" && <OpsDashboard />}
             {tab === "dispatch" && <DispatchBoard />}
+            {tab === "loadboard" && (
+              <LoadBoard
+                canPost={user.roles.some((r) => r === "dispatcher" || r === "admin")}
+                canBid={user.roles.some((r) => r === "independent_carrier" || r === "lease_operator" || r === "admin")}
+              />
+            )}
             {tab === "qa" && <QAConsole />}
           </>
         )}
