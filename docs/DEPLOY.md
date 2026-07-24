@@ -69,8 +69,9 @@ Restore: `docker compose -f docker-compose.prod.yml exec -T postgres psql -U nav
 ```bash
 ./scripts/deploy.sh
 ```
-Pulls, rebuilds, and restarts with zero config changes. Schema changes apply
-automatically on API boot (`prisma db push`).
+Pulls, rebuilds, and restarts with zero config changes. Committed migrations
+apply automatically on API boot (`prisma migrate deploy` — additive, never drops
+data). Generate new migrations in dev with `pnpm --filter @navastar/db migrate`.
 
 ## Operations cheatsheet
 ```bash

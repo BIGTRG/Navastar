@@ -12,5 +12,5 @@ RUN pnpm --filter @navastar/db generate
 ENV NODE_ENV=production
 EXPOSE 4000
 
-# On boot: apply schema (idempotent) then start the API.
-CMD ["sh", "-c", "pnpm --filter @navastar/db push && pnpm --filter @navastar/api start"]
+# On boot: apply committed migrations (safe; never drops data) then start the API.
+CMD ["sh", "-c", "pnpm --filter @navastar/db migrate:deploy && pnpm --filter @navastar/api start"]
