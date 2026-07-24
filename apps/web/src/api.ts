@@ -89,6 +89,40 @@ export interface ShipmentView {
   timeline: Array<{ sequence: number; type: string; at: string; hash: string }>;
 }
 
+export interface TrackPoint {
+  lat: number;
+  lng: number;
+  at: string;
+}
+export interface TrackData {
+  shipmentId: string;
+  trackingId: string;
+  status: string;
+  etaAt: string | null;
+  simulating: boolean;
+  pickup: { name: string; lat: number; lng: number } | null;
+  dropoff: { name: string; lat: number; lng: number } | null;
+  current: TrackPoint | null;
+  points: TrackPoint[];
+}
+
+/** Live-tracking WebSocket message (server → client). */
+export interface LiveMessage {
+  type: "connected" | "tracking.point" | "shipment.status";
+  shipmentId?: string;
+  lat?: number;
+  lng?: number;
+  etaAt?: string | null;
+  status?: string;
+  remainingMiles?: number | null;
+}
+
+/** Build the WS URL for a shipment's live stream (token in query). */
+export function liveSocketUrl(shipmentId: string): string {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  return `${proto}://${location.host}/ws/shipments/${encodeURIComponent(shipmentId)}?token=${getToken() ?? ""}`;
+}
+
 export function formatUSD(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 }

@@ -11,8 +11,8 @@ for go. Legend: ✅ done · 🟡 in progress · ⬜ not started.
 - ✅ Cross-cutting: AI envelope + AIDecision logger, hash-chained custody, event bus + outbox, RBAC matrix, provider adapters (Map/S3/Escrow), AuctionConnector + adapters
 
 ## Phase 1 — MVP
-- 🟡 **Module 1 — Auction intake** (API + UI): `POST /api/auction/lots` → draft shipment; "Deliver with Navastar" → `POST /api/quotes` (AI pricing) → instant quote → Book (returns tracking id)
-- ⬜ Module 2 — Customer tracking (live map, ETA, timeline over WS/SSE)
+- ✅ **Module 1 — Auction intake** (API + UI): `POST /api/auction/lots` → draft shipment; "Deliver with Navastar" → `POST /api/quotes` (AI pricing) → instant quote → Book (returns tracking id)
+- ✅ **Module 2 — Customer tracking**: live location over WebSocket (RealtimeHub + event-bus bridge), live Leaflet/OSM map, live ETA recompute via MapProvider, status timeline; demo movement simulator (`POST /api/shipments/:id/simulate`)
 - ⬜ Module 3 — Driver app (guided pickup, AI walk-around, VIN/odometer, POD)
 - ⬜ Module 4 — Ops dashboard (KPIs, shipments, global GPS map)
 - ⬜ Module 5 — QA console (review queue, Pass/Fix/Fail)

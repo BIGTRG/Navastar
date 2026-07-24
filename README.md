@@ -77,6 +77,16 @@ pnpm test          # unit tests: money/margin, RBAC, custody hash-chain, connect
 | POST | `/api/quotes` | `quote:create` | AI instant quote |
 | POST | `/api/shipments/:id/book` | `shipment:book` | accept quote → tracking id |
 | GET | `/api/shipments/:id` | any authed | status + custody timeline (margin stripped) |
+| GET | `/api/shipments/:id/track` | any authed | recent positions, current, ETA, pickup/dropoff |
+| POST | `/api/shipments/:id/tracking` | `shipment:track` | ingest a live position (driver/device) |
+| POST | `/api/shipments/:id/simulate` | `dispatch:assign` | demo: move shipment pickup→dropoff |
+| WS | `/ws/shipments/:id?token=` | valid JWT | live `tracking.point` / `shipment.status` stream |
+
+### Try live tracking (Module 2)
+Book a shipment (Module 1 flow), copy its tracking id, then in the **Track** tab paste it.
+Sign in as `dispatch@demo.navastar` and click **▶ Simulate movement** — the map marker
+walks the lane, ETA recomputes, and status advances (PICKED_UP → IN_TRANSIT → DELIVERED)
+live over the WebSocket.
 
 Deployment to a self-hosted Hetzner server (Caddy auto-HTTPS, nightly backups,
 one-command deploy) is added in the deployment phase — see the roadmap.

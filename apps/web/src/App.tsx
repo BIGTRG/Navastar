@@ -1,16 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   api,
   ApiError,
   setToken,
   getToken,
   formatUSD,
+  liveSocketUrl,
   type LoginResponse,
   type IntakeResponse,
   type QuoteResponse,
   type BookResponse,
   type ShipmentView,
+  type TrackData,
+  type LiveMessage,
+  type TrackPoint,
 } from "./api.js";
+import { LiveMap } from "./components/LiveMap.js";
 
 // ─────────────────────────────────────────────────────────────
 // Root
@@ -50,7 +55,11 @@ export function App() {
                 Track a shipment
               </TabButton>
             </div>
-            {tab === "deliver" ? <DeliverWizard /> : <TrackPanel />}
+            {tab === "deliver" ? (
+              <DeliverWizard />
+            ) : (
+              <TrackPanel canDispatch={user.roles.some((r) => r === "dispatcher" || r === "admin")} />
+            )}
           </>
         )}
       </main>
@@ -377,21 +386,62 @@ function BookedStep({ booked, onRestart }: { booked: BookResponse; onRestart: ()
 }
 
 // ─────────────────────────────────────────────────────────────
-// Track panel
+// Track panel — live map + WebSocket stream + ETA + timeline
 // ─────────────────────────────────────────────────────────────
-function TrackPanel() {
+function TrackPanel({ canDispatch }: { canDispatch: boolean }) {
   const [id, setId] = useState("");
   const [view, setView] = useState<ShipmentView | null>(null);
+  const [track, setTrack] = useState<TrackData | null>(null);
+  const [points, setPoints] = useState<TrackPoint[]>([]);
+  const [current, setCurrent] = useState<TrackPoint | null>(null);
+  const [status, setStatus] = useState<string>("");
+  const [eta, setEta] = useState<string | null>(null);
+  const [live, setLive] = useState(false);
+  const [simulating, setSimulating] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  // Close the socket on unmount.
+  useEffect(() => () => wsRef.current?.close(), []);
+
+  function openSocket(shipmentId: string) {
+    wsRef.current?.close();
+    const ws = new WebSocket(liveSocketUrl(shipmentId));
+    wsRef.current = ws;
+    ws.onopen = () => setLive(true);
+    ws.onclose = () => setLive(false);
+    ws.onerror = () => setLive(false);
+    ws.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data) as LiveMessage;
+      if (msg.type === "tracking.point" && msg.lat != null && msg.lng != null) {
+        const pt = { lat: msg.lat, lng: msg.lng, at: new Date().toISOString() };
+        setCurrent(pt);
+        setPoints((prev) => [...prev, pt]);
+        if (msg.etaAt !== undefined) setEta(msg.etaAt ?? null);
+      } else if (msg.type === "shipment.status" && msg.status) {
+        setStatus(msg.status);
+      }
+    };
+  }
 
   async function lookup() {
     setBusy(true);
     setErr(null);
-    setView(null);
     try {
-      const res = await api.get<ShipmentView>(`/api/shipments/${encodeURIComponent(id.trim())}`);
-      setView(res);
+      const key = id.trim();
+      const [v, t] = await Promise.all([
+        api.get<ShipmentView>(`/api/shipments/${encodeURIComponent(key)}`),
+        api.get<TrackData>(`/api/shipments/${encodeURIComponent(key)}/track`),
+      ]);
+      setView(v);
+      setTrack(t);
+      setPoints(t.points);
+      setCurrent(t.current);
+      setStatus(t.status);
+      setEta(t.etaAt);
+      setSimulating(t.simulating);
+      openSocket(t.shipmentId);
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : "Lookup failed");
     } finally {
@@ -399,8 +449,23 @@ function TrackPanel() {
     }
   }
 
+  async function toggleSim() {
+    if (!track) return;
+    try {
+      if (simulating) {
+        await api.post(`/api/shipments/${track.shipmentId}/simulate/stop`);
+        setSimulating(false);
+      } else {
+        await api.post(`/api/shipments/${track.shipmentId}/simulate`, { steps: 24, intervalMs: 1200 });
+        setSimulating(true);
+      }
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : "Simulation failed");
+    }
+  }
+
   return (
-    <Card title="Track a shipment" subtitle="GET /api/shipments/:id (tracking id or shipment id)">
+    <Card title="Track a shipment" subtitle="Live location over WebSocket · ETA · hash-chained timeline">
       <div className="flex gap-2">
         <input className={inputCls} placeholder="NAV-XXXX-XXXX" value={id} onChange={(e) => setId(e.target.value)} />
         <button disabled={busy || !id.trim()} onClick={lookup} className={primaryBtn}>
@@ -408,19 +473,41 @@ function TrackPanel() {
         </button>
       </div>
       {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
-      {view && (
+
+      {view && track && (
         <div className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <div className="font-semibold">{view.shipment.trackingId}</div>
               <div className="text-sm text-slate-500">
-                {view.cargo[0]?.description} · {view.pickup?.city} → {view.dropoff?.city}
+                {view.cargo[0]?.description} · {track.pickup?.name ?? view.pickup?.city} → {track.dropoff?.name ?? view.dropoff?.city}
               </div>
             </div>
-            <span className="rounded-full bg-navy-600 px-3 py-1 text-sm font-medium text-white">
-              {view.shipment.status}
-            </span>
+            <div className="flex items-center gap-2">
+              <LiveDot live={live} />
+              <span className="rounded-full bg-navy-600 px-3 py-1 text-sm font-medium text-white">{status}</span>
+            </div>
           </div>
+
+          <LiveMap pickup={track.pickup} dropoff={track.dropoff} points={points} current={current} />
+
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            <div>
+              <span className="text-slate-400">ETA:</span>{" "}
+              <span className="font-medium text-slate-700">{eta ? new Date(eta).toLocaleString() : "—"}</span>
+            </div>
+            {current && (
+              <div className="text-slate-400">
+                pos {current.lat.toFixed(3)}, {current.lng.toFixed(3)}
+              </div>
+            )}
+            {canDispatch && (
+              <button onClick={toggleSim} className={`${secondaryBtn} ml-auto`}>
+                {simulating ? "■ Stop simulation" : "▶ Simulate movement"}
+              </button>
+            )}
+          </div>
+
           <div>
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
               Custody timeline (hash-chained)
@@ -437,10 +524,24 @@ function TrackPanel() {
                 </li>
               ))}
             </ol>
+            {!canDispatch && (
+              <p className="mt-3 text-xs text-slate-400">
+                Tip: sign in as <code>dispatch@demo.navastar</code> to simulate live movement.
+              </p>
+            )}
           </div>
         </div>
       )}
     </Card>
+  );
+}
+
+function LiveDot({ live }: { live: boolean }) {
+  return (
+    <span className="flex items-center gap-1 text-xs">
+      <span className={`h-2 w-2 rounded-full ${live ? "bg-green-500" : "bg-slate-300"}`} />
+      <span className={live ? "text-green-600" : "text-slate-400"}>{live ? "live" : "offline"}</span>
+    </span>
   );
 }
 
