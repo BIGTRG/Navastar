@@ -29,6 +29,8 @@ services:
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:-navastar}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-navastar-secret}
+      # Allow browser presigned PUT/GET from the web app (dev). Lock down in prod.
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
     ports:
       - "9000:9000"   # S3 API
       - "9001:9001"   # web console

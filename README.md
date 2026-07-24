@@ -88,5 +88,22 @@ Sign in as `dispatch@demo.navastar` and click **▶ Simulate movement** — the 
 walks the lane, ETA recomputes, and status advances (PICKED_UP → IN_TRANSIT → DELIVERED)
 live over the WebSocket.
 
+### Try the Driver app (Module 3)
+Sign in as `driver@demo.navastar` → **Driver app** tab → open a job:
+1. **Run AI walk-around** → condition score + AI findings appear on a vehicle diagram; click panels to add damage, edit severities, then **Approve** (human-in-the-loop; QA verifies later).
+2. **Auto-read** VIN + odometer (OCR stub).
+3. **Complete pickup** → status advances.
+4. **Delivery** → sign on the pad, attach photos, **Submit POD** → Delivered. Photos/signature upload **directly to MinIO** via presigned URLs; POD fires the escrow-release hook.
+
+| Method | Path | Permission | Purpose |
+|---|---|---|---|
+| GET | `/api/driver/jobs` | `driver_jobs:read` | active jobs (margin stripped) |
+| POST | `/api/uploads/presign` | `media:upload` | presigned direct-to-storage PUT |
+| POST | `/api/shipments/:id/inspections` | `inspection:submit` | AI walk-around → findings |
+| POST | `/api/inspections/:id/approve` | `inspection:submit` | driver approves/edits findings |
+| POST | `/api/shipments/:id/ocr` | `inspection:submit` | VIN/odometer OCR |
+| POST | `/api/shipments/:id/pickup` | `inspection:submit` | complete pickup |
+| POST | `/api/shipments/:id/pod` | `pod:submit` | signature + photo POD → Delivered |
+
 Deployment to a self-hosted Hetzner server (Caddy auto-HTTPS, nightly backups,
 one-command deploy) is added in the deployment phase — see the roadmap.

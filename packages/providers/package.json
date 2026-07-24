@@ -9,14 +9,18 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@navastar/db": "workspace:*",
-    "@navastar/shared": "workspace:*"
+    "@navastar/shared": "workspace:*",
+    "@aws-sdk/client-s3": "^3.637.0",
+    "@aws-sdk/s3-request-presigner": "^3.637.0"
   },
   "devDependencies": {
     "typescript": "^5.5.4",
-    "@types/node": "^20.14.14"
+    "@types/node": "^20.14.14",
+    "vitest": "^2.0.5"
   }
 }

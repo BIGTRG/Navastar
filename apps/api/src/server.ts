@@ -10,6 +10,8 @@ import quoteRoutes from "./routes/quotes.js";
 import shipmentRoutes from "./routes/shipments.js";
 import connectorRoutes from "./routes/connectors.js";
 import trackingRoutes from "./routes/tracking.js";
+import uploadRoutes from "./routes/uploads.js";
+import driverRoutes from "./routes/driver.js";
 import { hub } from "./realtime.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -33,6 +35,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(shipmentRoutes);
   // Module 2 — live tracking (REST + WebSocket).
   await app.register(trackingRoutes);
+  // Module 3 — driver app (media + guided pickup + inspection + POD).
+  await app.register(uploadRoutes);
+  await app.register(driverRoutes);
 
   app.setErrorHandler((err, _req, reply) => {
     const status = (err as { statusCode?: number }).statusCode ?? 500;

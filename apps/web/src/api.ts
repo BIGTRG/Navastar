@@ -123,6 +123,46 @@ export function liveSocketUrl(shipmentId: string): string {
   return `${proto}://${location.host}/ws/shipments/${encodeURIComponent(shipmentId)}?token=${getToken() ?? ""}`;
 }
 
+// ── Module 3 — driver / media ──
+export interface DriverJob {
+  trackingId: string;
+  status: string;
+  cargo: Array<{ description: string; vin?: string | null; odometer?: number | null }>;
+  pickup: { name: string; city: string | null; lat: number | null; lng: number | null } | null;
+  dropoff: { name: string; city: string | null } | null;
+  id?: string;
+}
+export interface Finding {
+  id?: string;
+  panel?: string;
+  kind: string;
+  severity: "INFO" | "MINOR" | "MODERATE" | "MAJOR" | "CRITICAL";
+  note?: string;
+  source: "ai" | "human";
+  confidence?: number;
+}
+export interface InspectionResponse {
+  inspectionId: string;
+  conditionScore: number | null;
+  findings: Finding[];
+  ai: { model: string; version: string; confidence: number; needsHumanReview: boolean; decidedBy: string; qaStatus: string };
+}
+export interface PresignedUpload {
+  key: string;
+  uploadUrl: string;
+  method: "PUT";
+  headers?: Record<string, string>;
+}
+
+/** Presign → PUT bytes directly to storage (MinIO/S3). Returns the object key. */
+export async function uploadMedia(shipmentId: string, kind: string, file: File | Blob, filename: string): Promise<string> {
+  const mimeType = (file as File).type || "application/octet-stream";
+  const presigned = await api.post<PresignedUpload>("/api/uploads/presign", { shipmentId, kind, filename, mimeType });
+  const put = await fetch(presigned.uploadUrl, { method: "PUT", headers: presigned.headers, body: file });
+  if (!put.ok) throw new ApiError(put.status, `Upload failed (${put.status}). Is MinIO running + CORS allowed?`);
+  return presigned.key;
+}
+
 export function formatUSD(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 }

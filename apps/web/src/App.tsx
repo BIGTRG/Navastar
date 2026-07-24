@@ -16,13 +16,14 @@ import {
   type TrackPoint,
 } from "./api.js";
 import { LiveMap } from "./components/LiveMap.js";
+import { DriverApp } from "./components/DriverApp.js";
 
 // ─────────────────────────────────────────────────────────────
 // Root
 // ─────────────────────────────────────────────────────────────
 export function App() {
   const [user, setUser] = useState<LoginResponse["user"] | null>(null);
-  const [tab, setTab] = useState<"deliver" | "track">("deliver");
+  const [tab, setTab] = useState<"deliver" | "track" | "driver">("deliver");
 
   useEffect(() => {
     if (getToken()) {
@@ -54,12 +55,19 @@ export function App() {
               <TabButton active={tab === "track"} onClick={() => setTab("track")}>
                 Track a shipment
               </TabButton>
+              {user.roles.some((r) =>
+                ["employee_driver", "lease_operator", "independent_carrier", "dispatcher", "admin"].includes(r)
+              ) && (
+                <TabButton active={tab === "driver"} onClick={() => setTab("driver")}>
+                  Driver app
+                </TabButton>
+              )}
             </div>
-            {tab === "deliver" ? (
-              <DeliverWizard />
-            ) : (
+            {tab === "deliver" && <DeliverWizard />}
+            {tab === "track" && (
               <TrackPanel canDispatch={user.roles.some((r) => r === "dispatcher" || r === "admin")} />
             )}
+            {tab === "driver" && <DriverApp />}
           </>
         )}
       </main>

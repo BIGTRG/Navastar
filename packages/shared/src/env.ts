@@ -20,6 +20,11 @@ const schema = z.object({
     .string()
     .default("true")
     .transform((v) => v === "true"),
+  // Real S3/MinIO adapter by default; `stub` for tests / zero-infra runs.
+  STORAGE_PROVIDER: z.enum(["s3", "stub"]).default("s3"),
+  // Public base URL browsers use to reach object storage (presigned PUT/GET).
+  // Defaults to S3_ENDPOINT; override when MinIO is behind a different host.
+  S3_PUBLIC_URL: z.string().optional().default(""),
 
   MAP_PROVIDER: z.enum(["osm", "here"]).default("osm"),
   HERE_API_KEY: z.string().optional().default(""),
