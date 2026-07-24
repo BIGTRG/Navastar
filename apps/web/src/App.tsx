@@ -23,6 +23,7 @@ import { DispatchBoard } from "./components/DispatchBoard.js";
 import { LoadBoard } from "./components/LoadBoard.js";
 import { Onboarding } from "./components/Onboarding.js";
 import { Payments } from "./components/Payments.js";
+import { Compliance } from "./components/Compliance.js";
 
 // ─────────────────────────────────────────────────────────────
 // Root
@@ -30,7 +31,7 @@ import { Payments } from "./components/Payments.js";
 export function App() {
   const [user, setUser] = useState<LoginResponse["user"] | null>(null);
   const [tab, setTab] = useState<
-    "deliver" | "track" | "driver" | "ops" | "qa" | "dispatch" | "loadboard" | "onboarding" | "pay"
+    "deliver" | "track" | "driver" | "ops" | "qa" | "dispatch" | "loadboard" | "onboarding" | "pay" | "compliance"
   >("deliver");
 
   useEffect(() => {
@@ -85,6 +86,11 @@ export function App() {
                   QA
                 </TabButton>
               )}
+              {user.roles.some((r) => ["dispatcher", "qa_reviewer", "admin"].includes(r)) && (
+                <TabButton active={tab === "compliance"} onClick={() => setTab("compliance")}>
+                  Compliance
+                </TabButton>
+              )}
               {user.roles.some((r) =>
                 ["independent_carrier", "lease_operator", "dispatcher", "admin"].includes(r)
               ) && (
@@ -137,6 +143,7 @@ export function App() {
               />
             )}
             {tab === "qa" && <QAConsole />}
+            {tab === "compliance" && <Compliance />}
           </>
         )}
       </main>

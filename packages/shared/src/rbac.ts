@@ -37,6 +37,8 @@ export const Permission = {
   PAYMENTS_VIEW: "payments:view",
   PAYOUT_VIEW_OWN: "payout:view_own",
   PAYMENTS_SETTLE: "payments:settle",
+  // compliance / custody
+  COMPLIANCE_VIEW: "compliance:view",
   // qa
   QA_REVIEW: "qa:review",
   // admin / revenue
@@ -108,8 +110,9 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.ONBOARD_MANAGE,
     P.PAYMENTS_VIEW,
     P.PAYMENTS_SETTLE,
+    P.COMPLIANCE_VIEW,
   ],
-  [Role.qa_reviewer]: [P.QA_REVIEW, P.SHIPMENT_READ_ALL, P.SHIPMENT_TRACK],
+  [Role.qa_reviewer]: [P.QA_REVIEW, P.SHIPMENT_READ_ALL, P.SHIPMENT_TRACK, P.COMPLIANCE_VIEW],
   [Role.equipment_lessor]: [P.SHIPMENT_TRACK],
   [Role.admin]: [P.ADMIN_ALL], // expanded to all permissions by hasPermission()
 };

@@ -22,6 +22,7 @@ import loadboardRoutes from "./routes/loadboard.js";
 import onboardingRoutes from "./routes/onboarding.js";
 import paymentRoutes from "./routes/payments.js";
 import partnerRoutes from "./routes/partner.js";
+import complianceRoutes from "./routes/compliance.js";
 import { hub } from "./realtime.js";
 import { initPayments } from "./lib/payments.js";
 import { initWebhooks } from "./lib/webhooks.js";
@@ -87,6 +88,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(paymentRoutes);
   // Module 10 — public/partner API + webhooks + widget.
   await app.register(partnerRoutes);
+  // Module 11 — custody & compliance (rules engine + chain verify/export).
+  await app.register(complianceRoutes);
 
   app.setErrorHandler((err, _req, reply) => {
     const status = (err as { statusCode?: number }).statusCode ?? 500;
