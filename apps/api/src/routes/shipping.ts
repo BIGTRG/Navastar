@@ -69,6 +69,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
           trackingId: generateTrackingId(),
           status: ShipmentStatus.DRAFT,
           commodityId: commodity.id,
+          ownerUserId: req.principal?.userId ?? null, // object-level authz (P0 #1)
           pickupId: pickup.id,
           dropoffId: dropoff.id,
           cargoItems: {

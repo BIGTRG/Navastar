@@ -265,6 +265,7 @@ model User {
   ratingsGiven  Rating[]     @relation("RatingAuthor")
   ownedCarriers Carrier[]    @relation("CarrierOwner")
   bids          Bid[]        @relation("BidderUser")
+  ownedShipments Shipment[]  @relation("ShipmentOwner")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -492,6 +493,10 @@ model Shipment {
   auctionLotId String?     @unique
   auctionLot   AuctionLot? @relation(fields: [auctionLotId], references: [id])
 
+  // The customer/user who owns this shipment (object-level authorization).
+  ownerUserId String?
+  owner       User?   @relation("ShipmentOwner", fields: [ownerUserId], references: [id])
+
   // money — customer-facing only. Driver/carrier pay lives on Leg + Payment.
   // marginBps + payout are NEVER serialized to driver-scoped responses.
   quotedPriceCents Int?
@@ -519,6 +524,7 @@ model Shipment {
 
   @@index([status])
   @@index([commodityId])
+  @@index([ownerUserId])
 }
 
 model CargoItem {

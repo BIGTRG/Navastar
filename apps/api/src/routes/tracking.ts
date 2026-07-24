@@ -8,6 +8,7 @@ import { z } from "zod";
 import { recordTrackingPoint } from "../lib/tracking.js";
 import { startSimulation, stopSimulation, isSimulating } from "../lib/simulator.js";
 import { hub } from "../realtime.js";
+import { canAccessShipment } from "../lib/access.js";
 
 const pingBody = z.object({
   lat: z.number(),
@@ -38,9 +39,19 @@ export default async function trackingRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const shipment = await prisma.shipment.findFirst({
       where: { OR: [{ id }, { trackingId: id }] },
-      include: { pickup: true, dropoff: true },
+      include: { pickup: true, dropoff: true, legs: { include: { driver: true, carrier: true } } },
     });
     if (!shipment) return reply.code(404).send({ error: "shipment_not_found" });
+    // Object-level authorization (P0 #1).
+    if (
+      !canAccessShipment(req.principal, {
+        ownerUserId: shipment.ownerUserId,
+        driverUserIds: shipment.legs.map((l) => l.driver?.userId).filter((x): x is string => !!x),
+        carrierOwnerUserIds: shipment.legs.map((l) => l.carrier?.ownerUserId).filter((x): x is string => !!x),
+      })
+    ) {
+      return reply.code(403).send({ error: "forbidden" });
+    }
     const points = await prisma.trackingPoint.findMany({
       where: { shipmentId: shipment.id },
       orderBy: { recordedAt: "asc" },

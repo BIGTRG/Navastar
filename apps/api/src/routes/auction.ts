@@ -105,6 +105,7 @@ export default async function auctionRoutes(app: FastifyInstance) {
             status: ShipmentStatus.DRAFT,
             commodityId: commodity.id,
             auctionLotId: auctionLot.id,
+            ownerUserId: req.principal?.userId ?? null, // object-level authz (P0 #1)
             buyerId: buyer?.id ?? null,
             pickupId: pickup.id,
             cargoItems: {
