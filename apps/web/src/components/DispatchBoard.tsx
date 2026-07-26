@@ -10,6 +10,7 @@ import {
   type MatchResponse,
   type MatchCandidate,
 } from "../api.js";
+import { StubBadge } from "./StubBadge.js";
 
 const primary = "rounded-lg bg-navy-600 px-3 py-2 text-sm font-medium text-white hover:bg-navy-700 disabled:opacity-50";
 const secondary = "rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50";
@@ -132,6 +133,7 @@ function MatchView({ item, onDone }: { item: DispatchQueueItem; onDone: () => vo
       {match && (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">engine {match.ai.model}</span>
+          <StubBadge model={match.ai.model} version={match.ai.version} />
           <span
             className={`rounded-full px-2 py-0.5 ${match.ai.confidence >= 0.75 ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}
           >

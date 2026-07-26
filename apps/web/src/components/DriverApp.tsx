@@ -10,6 +10,7 @@ import {
   type Finding,
   type InspectionResponse,
 } from "../api.js";
+import { StubBadge } from "./StubBadge.js";
 
 const input = "w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-navy-600";
 const primary = "rounded-lg bg-navy-600 px-4 py-2 text-sm font-medium text-white hover:bg-navy-700 disabled:opacity-50";
@@ -237,6 +238,7 @@ function PickupSection({
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">⚑ human review</span>
               )}
               <span className="text-xs text-slate-400">AI {Math.round(inspection.ai.confidence * 100)}%</span>
+              <StubBadge model={inspection.ai.model} version={inspection.ai.version} className="text-[10px]" />
             </div>
             <input type="range" min={0} max={100} value={score} onChange={(e) => setScore(Number(e.target.value))} className="w-full" />
           </div>
