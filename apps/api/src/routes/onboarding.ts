@@ -3,6 +3,7 @@
 // logged as an AI CARRIER_LOOKUP decision), carrier insurance/authority capture,
 // and license-scan + background stubs for employees. Ops verifies.
 import type { FastifyInstance } from "fastify";
+import { idParams } from "../lib/validation.js";
 import { z } from "zod";
 import {
   prisma,
@@ -190,7 +191,7 @@ export default async function onboardingRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/onboarding/carrier/:id/verify", manage, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const body = z.object({ approve: z.boolean().default(true) }).parse(req.body ?? {});
     const carrier = await prisma.carrier.update({
       where: { id },
@@ -202,7 +203,7 @@ export default async function onboardingRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/onboarding/driver/:id/verify", manage, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const body = z.object({ approve: z.boolean().default(true) }).parse(req.body ?? {});
     const driver = await prisma.driver.update({
       where: { id },

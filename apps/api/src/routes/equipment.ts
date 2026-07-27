@@ -1,6 +1,7 @@
 // Module 14 — Equipment leasing marketplace. Lessors list equipment; carriers/
 // operators lease it. Simple availability model: leasing a listing reserves it.
 import type { FastifyInstance } from "fastify";
+import { idParams } from "../lib/validation.js";
 import { z } from "zod";
 import { prisma, AssetType, LeaseStatus } from "@navastar/db";
 import { Permission } from "@navastar/shared";
@@ -34,7 +35,7 @@ export default async function equipmentRoutes(app: FastifyInstance) {
 
   // Lease a listing.
   app.post("/api/equipment/listings/:id/lease", { preHandler: [app.requirePermission(Permission.EQUIPMENT_LEASE)] }, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const body = z.object({ startAt: z.string().datetime().optional(), endAt: z.string().datetime().optional() }).parse(req.body ?? {});
     const listing = await prisma.equipmentListing.findUnique({ where: { id } });
     if (!listing) return reply.code(404).send({ error: "listing_not_found" });

@@ -1,5 +1,6 @@
 // Builds the Fastify app (no listen) so tests can import it directly.
 import Fastify, { type FastifyInstance } from "fastify";
+import { ZodError } from "zod";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
@@ -114,6 +115,15 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(aiRoutes);
 
   app.setErrorHandler((err, _req, reply) => {
+    // Validation failures (thrown ZodError from a route's .parse()) are client
+    // errors — map them to 400 with the offending fields, not a 500.
+    if (err instanceof ZodError) {
+      return reply.code(400).send({
+        error: "validation_error",
+        message: "Invalid request",
+        issues: err.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
+      });
+    }
     const status = (err as { statusCode?: number }).statusCode ?? 500;
     reply.code(status).send({
       error: status >= 500 ? "internal_error" : "request_error",

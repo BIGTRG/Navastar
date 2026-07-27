@@ -3,6 +3,7 @@
 // delivery with signature + photo POD. Every AI output runs through runAi() so it
 // carries confidence, routes to a human below threshold, and is QA-auditable.
 import type { FastifyInstance } from "fastify";
+import { idParams, idSchema } from "../lib/validation.js";
 import { z } from "zod";
 import {
   prisma,
@@ -92,7 +93,7 @@ export default async function driverRoutes(app: FastifyInstance) {
     "/api/shipments/:id/inspections",
     { preHandler: [app.requirePermission(Permission.INSPECTION_SUBMIT)] },
     async (req, reply) => {
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const parsed = inspectionBody.safeParse(req.body);
       if (!parsed.success) return reply.code(400).send({ error: "bad_request", issues: parsed.error.issues });
       const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });
@@ -156,7 +157,7 @@ export default async function driverRoutes(app: FastifyInstance) {
     "/api/inspections/:id/approve",
     { preHandler: [app.requirePermission(Permission.INSPECTION_SUBMIT)] },
     async (req, reply) => {
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const parsed = approveBody.safeParse(req.body);
       if (!parsed.success) return reply.code(400).send({ error: "bad_request", issues: parsed.error.issues });
       const inspection = await prisma.inspection.findUnique({ where: { id } });
@@ -201,7 +202,7 @@ export default async function driverRoutes(app: FastifyInstance) {
     "/api/shipments/:id/ocr",
     { preHandler: [app.requirePermission(Permission.INSPECTION_SUBMIT)] },
     async (req, reply) => {
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const parsed = ocrBody.safeParse(req.body);
       if (!parsed.success) return reply.code(400).send({ error: "bad_request", issues: parsed.error.issues });
       const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });
@@ -226,7 +227,7 @@ export default async function driverRoutes(app: FastifyInstance) {
     "/api/shipments/:id/cargo/:cargoId",
     { preHandler: [app.requirePermission(Permission.INSPECTION_SUBMIT)] },
     async (req, reply) => {
-      const { cargoId } = req.params as { id: string; cargoId: string };
+      const { cargoId } = z.object({ id: idSchema, cargoId: idSchema }).parse(req.params);
       const parsed = cargoBody.safeParse(req.body);
       if (!parsed.success) return reply.code(400).send({ error: "bad_request", issues: parsed.error.issues });
       const cargo = await prisma.cargoItem.update({
@@ -242,7 +243,7 @@ export default async function driverRoutes(app: FastifyInstance) {
     "/api/shipments/:id/pickup",
     { preHandler: [app.requirePermission(Permission.INSPECTION_SUBMIT)] },
     async (req, reply) => {
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });
       if (!shipment) return reply.code(404).send({ error: "shipment_not_found" });
       const updated = await advanceStatus(
@@ -261,7 +262,7 @@ export default async function driverRoutes(app: FastifyInstance) {
     "/api/shipments/:id/pod",
     { preHandler: [app.requirePermission(Permission.POD_SUBMIT)] },
     async (req, reply) => {
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const parsed = podBody.safeParse(req.body);
       if (!parsed.success) return reply.code(400).send({ error: "bad_request", issues: parsed.error.issues });
       const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });

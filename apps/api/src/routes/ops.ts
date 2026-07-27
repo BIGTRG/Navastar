@@ -2,6 +2,7 @@
 // queue, and the Global GPS map roster (fleet vs contractor). A WebSocket ops
 // channel streams live `driver.location` events; a roam simulator animates it.
 import type { FastifyInstance } from "fastify";
+import { idParams } from "../lib/validation.js";
 import { z } from "zod";
 import {
   prisma,
@@ -168,12 +169,12 @@ export default async function opsRoutes(app: FastifyInstance) {
   // Demo: animate a driver on the map.
   app.post("/api/ops/drivers/:id/roam", { preHandler: [app.requirePermission(Permission.DISPATCH_ASSIGN)] }, async (req, reply) => {
     if (!demoEnabled()) return reply.code(403).send({ error: "demo_disabled", message: "Fleet roam simulator is disabled in production." });
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const res = await startRoam(id);
     return reply.code(res.alreadyRunning ? 200 : 202).send({ driverId: id, ...res });
   });
   app.post("/api/ops/drivers/:id/roam/stop", { preHandler: [app.requirePermission(Permission.DISPATCH_ASSIGN)] }, async (req) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     return { driverId: id, stopped: stopRoam(id) };
   });
 

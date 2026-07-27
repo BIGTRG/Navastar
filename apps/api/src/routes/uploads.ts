@@ -1,6 +1,7 @@
 // Module 3 — media. Presigned direct-to-storage uploads (bytes never touch the
 // API) + document registration. Backed by the real S3/MinIO adapter.
 import type { FastifyInstance } from "fastify";
+import { idParams } from "../lib/validation.js";
 import { z } from "zod";
 import { prisma, DocumentType } from "@navastar/db";
 import { Permission } from "@navastar/shared";
@@ -41,7 +42,7 @@ export default async function uploadRoutes(app: FastifyInstance) {
     "/api/shipments/:id/documents",
     { preHandler: [app.requirePermission(Permission.MEDIA_UPLOAD)] },
     async (req, reply) => {
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const parsed = docBody.safeParse(req.body);
       if (!parsed.success) return reply.code(400).send({ error: "bad_request", issues: parsed.error.issues });
       const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });

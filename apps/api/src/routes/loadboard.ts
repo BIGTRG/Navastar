@@ -4,6 +4,7 @@
 // connection fee (a revenue stream). Subscription + connection fee are the two
 // monetization levers introduced here — both read from the DB-backed RevenueConfig.
 import type { FastifyInstance } from "fastify";
+import { idParams } from "../lib/validation.js";
 import { z } from "zod";
 import {
   prisma,
@@ -135,7 +136,7 @@ export default async function loadboardRoutes(app: FastifyInstance) {
     "/api/loadboard/posts/:id/bids",
     { preHandler: [app.requirePermission(Permission.LOAD_BID)] },
     async (req, reply) => {
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const body = z.object({ amountCents: z.number().int().positive(), note: z.string().optional() }).safeParse(req.body);
       if (!body.success) return reply.code(400).send({ error: "bad_request", issues: body.error.issues });
 
@@ -169,7 +170,7 @@ export default async function loadboardRoutes(app: FastifyInstance) {
     "/api/loadboard/posts/:id/bids",
     { preHandler: [app.requirePermission(Permission.LOAD_POST)] },
     async (req, reply) => {
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const post = await prisma.loadPost.findUnique({ where: { id } });
       if (!post) return reply.code(404).send({ error: "load_not_found" });
       const bids = await prisma.bid.findMany({
@@ -196,7 +197,7 @@ export default async function loadboardRoutes(app: FastifyInstance) {
     "/api/loadboard/bids/:id/award",
     { preHandler: [app.requirePermission(Permission.LOAD_POST)] },
     async (req, reply) => {
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const bid = await prisma.bid.findUnique({ where: { id }, include: { loadPost: true } });
       if (!bid) return reply.code(404).send({ error: "bid_not_found" });
       if (bid.loadPost.status !== LoadPostStatus.OPEN) return reply.code(409).send({ error: "load_not_open" });

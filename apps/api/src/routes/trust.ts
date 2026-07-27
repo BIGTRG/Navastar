@@ -4,6 +4,7 @@
 // FMCSA free feed now (carrierLookup stub) with a vendor adapter seam for
 // Highway/MyCarrierPortal/Carrier411 later.
 import type { FastifyInstance } from "fastify";
+import { idParams, idSchema } from "../lib/validation.js";
 import { z } from "zod";
 import { prisma, InsuranceType, ClaimStatus, AIDecisionKind } from "@navastar/db";
 import { Permission, getAi, runAi } from "@navastar/shared";
@@ -41,7 +42,9 @@ export default async function trustRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/ratings/:subjectType/:subjectId", { preHandler: [app.authenticate] }, async (req) => {
-    const { subjectType, subjectId } = req.params as { subjectType: string; subjectId: string };
+    const { subjectType, subjectId } = z
+      .object({ subjectType: z.string().min(1).max(32), subjectId: idSchema })
+      .parse(req.params);
     const ratings = await prisma.rating.findMany({ where: { subjectType, subjectId }, orderBy: { createdAt: "desc" }, take: 50 });
     const avg = ratings.length ? ratings.reduce((s, r) => s + r.stars, 0) / ratings.length : null;
     return {
@@ -53,7 +56,7 @@ export default async function trustRoutes(app: FastifyInstance) {
 
   // ── Insurance ──
   app.post("/api/carriers/:id/insurance", { preHandler: [app.requirePermission(Permission.INSURANCE_MANAGE)] }, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const body = z
       .object({
         type: z.nativeEnum(InsuranceType).default(InsuranceType.CARGO),
@@ -97,7 +100,7 @@ export default async function trustRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/claims/:id/status", { preHandler: [app.requirePermission(Permission.CLAIM_MANAGE)] }, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const body = z.object({ status: z.nativeEnum(ClaimStatus) }).safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: "bad_request", issues: body.error.issues });
     const claim = await prisma.claim.update({ where: { id }, data: { status: body.data.status } });
@@ -141,7 +144,7 @@ export default async function trustRoutes(app: FastifyInstance) {
 
   // Refresh a carrier's monitoring posture from FMCSA + fraud model (both stubs).
   app.post("/api/monitoring/carriers/:id/refresh", { preHandler: [app.requirePermission(Permission.MONITORING_VIEW)] }, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const carrier = await prisma.carrier.findUnique({ where: { id } });
     if (!carrier) return reply.code(404).send({ error: "carrier_not_found" });
 
