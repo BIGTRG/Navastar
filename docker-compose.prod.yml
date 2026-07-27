@@ -1,0 +1,122 @@
+# Navastar — production stack for a single self-hosted host (e.g. Hetzner).
+#   web (Caddy: SPA + auto-HTTPS + reverse proxy) · api · postgres · minio
+# Deploy:  git pull && docker compose -f docker-compose.prod.yml up -d --build
+# All secrets/config come from .env (copy from .env.example).
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-navastar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-navastar}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-navastar} -d ${POSTGRES_DB:-navastar}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?set S3_SECRET_KEY}
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio-setup:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${S3_ACCESS_KEY} ${S3_SECRET_KEY} &&
+      mc mb --ignore-existing local/${S3_BUCKET:-navastar-media} &&
+      mc anonymous set download local/${S3_BUCKET:-navastar-media};
+      "
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      API_PORT: 4000
+      DOMAIN: ${DOMAIN}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-navastar}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-navastar}?schema=public
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-navastar-media}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_FORCE_PATH_STYLE: "true"
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-s3}
+      MAP_PROVIDER: ${MAP_PROVIDER:-osm}
+      HERE_API_KEY: ${HERE_API_KEY:-}
+      AI_PROVIDER: ${AI_PROVIDER:-stub}
+      AI_INSPECTION_PROVIDER: ${AI_INSPECTION_PROVIDER:-stub}
+      AI_OCR_PROVIDER: ${AI_OCR_PROVIDER:-stub}
+      WIDGET_WEB_URL: https://${DOMAIN}
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddydata:/data
+      - caddyconfig:/config
+
+  # Nightly pg_dump → ./backups on the host (timestamped, keeps last 14).
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    entrypoint: >
+      /bin/sh -c "
+      while true; do
+        ts=$$(date +%Y%m%d-%H%M%S);
+        pg_dump -h postgres -U ${POSTGRES_USER:-navastar} -d ${POSTGRES_DB:-navastar} > /backups/navastar-$$ts.sql &&
+        echo backed up navastar-$$ts.sql;
+        ls -1t /backups/navastar-*.sql | tail -n +15 | xargs -r rm --;
+        sleep 86400;
+      done"
+
+volumes:
+  pgdata:
+  miniodata:
+  caddydata:
+  caddyconfig:

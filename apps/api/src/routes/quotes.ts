@@ -12,6 +12,7 @@ import {
 } from "@navastar/db";
 import { quoteRequest, Permission, getAi, runAi } from "@navastar/shared";
 import { getMapProvider } from "@navastar/providers";
+import { canAccessShipment } from "../lib/access.js";
 
 export default async function quoteRoutes(app: FastifyInstance) {
   app.post(
@@ -26,9 +27,19 @@ export default async function quoteRoutes(app: FastifyInstance) {
 
       const shipment = await prisma.shipment.findUnique({
         where: { id: shipmentId },
-        include: { pickup: true, dropoff: true, commodity: true, cargoItems: true },
+        include: { pickup: true, dropoff: true, commodity: true, cargoItems: true, legs: { include: { driver: true, carrier: true } } },
       });
       if (!shipment) return reply.code(404).send({ error: "shipment_not_found" });
+      // Only the owning customer (or ops) may quote this shipment (P0 #1).
+      if (
+        !canAccessShipment(req.principal, {
+          ownerUserId: shipment.ownerUserId,
+          driverUserIds: shipment.legs.map((l) => l.driver?.userId).filter((x): x is string => !!x),
+          carrierOwnerUserIds: shipment.legs.map((l) => l.carrier?.ownerUserId).filter((x): x is string => !!x),
+        })
+      ) {
+        return reply.code(403).send({ error: "forbidden" });
+      }
       const quotable: ShipmentStatus[] = [ShipmentStatus.DRAFT, ShipmentStatus.QUOTED];
       if (!quotable.includes(shipment.status)) {
         return reply.code(409).send({ error: "not_quotable", message: `Shipment is ${shipment.status}.` });

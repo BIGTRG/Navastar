@@ -1,0 +1,16 @@
+# Navastar API — runs the Fastify server (tsx runtime; resolves workspace source).
+FROM node:20-alpine
+# Prisma engine needs openssl + libc compat on Alpine.
+RUN apk add --no-cache openssl libc6-compat && corepack enable
+WORKDIR /app
+
+# Install deps (whole monorepo; .dockerignore excludes node_modules/dist).
+COPY . .
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @navastar/db generate
+
+ENV NODE_ENV=production
+EXPOSE 4000
+
+# On boot: apply committed migrations (safe; never drops data) then start the API.
+CMD ["sh", "-c", "pnpm --filter @navastar/db migrate:deploy && pnpm --filter @navastar/api start"]

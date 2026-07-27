@@ -65,7 +65,16 @@ Other demo logins (all `password123`): `dispatch@demo.navastar` (can see margin)
 ## Test
 ```bash
 pnpm db:generate   # required once so @navastar/db can import the client
-pnpm test          # unit tests: money/margin, RBAC, custody hash-chain, connectors, API guards
+pnpm test          # unit + guard tests (no DB needed)
+```
+**Integration tests** (real end-to-end flows) run against a live Postgres and
+self-skip otherwise:
+```bash
+createdb navastar_test    # or use the docker Postgres
+export TEST_DATABASE_URL="postgresql://navastar:navastar@localhost:5432/navastar_test?schema=public"
+DATABASE_URL="$TEST_DATABASE_URL" pnpm --filter @navastar/db push
+DATABASE_URL="$TEST_DATABASE_URL" pnpm --filter @navastar/db seed
+pnpm --filter @navastar/api test   # now the integration suite runs too
 ```
 
 ## API quick reference (Module 1)
@@ -148,5 +157,33 @@ advances to ASSIGNED.
 | POST | `/api/dispatch/shipments/:id/match` | `dispatch:assign` | ranked candidates (AI-logged) |
 | POST | `/api/dispatch/shipments/:id/assign` | `dispatch:assign` | auto/manual assign → Leg |
 
-Deployment to a self-hosted Hetzner server (Caddy auto-HTTPS, nightly backups,
-one-command deploy) is added in the deployment phase — see the roadmap.
+### Try the Load board (Module 7)
+> Schema changed this module — run `pnpm db:push && pnpm db:seed` first.
+
+As `dispatch@demo.navastar` → **Load board**: post a booked shipment as an overflow load.
+As `carrier@demo.navastar` → **Load board**: browse open loads and **bid** (the demo carrier
+has an active PRO subscription; unsubscribed carriers see a paywall). Back as dispatch,
+**Award** a bid → the load is assigned to that carrier and a **per-load connection fee** is
+charged (inbound revenue).
+
+| Method | Path | Permission | Purpose |
+|---|---|---|---|
+| POST | `/api/loadboard/posts` | `load:post` | post an overflow load |
+| GET | `/api/loadboard/posts` | `load_board:view` | browse (subscription-gated) |
+| POST | `/api/loadboard/posts/:id/bids` | `load:bid` | bid (needs active subscription) |
+| POST | `/api/loadboard/bids/:id/award` | `load:post` | award → assign + connection fee |
+| POST | `/api/loadboard/subscribe` | `load_board:view` | subscribe / change tier |
+
+## Deploy (self-hosted)
+Production stack — web (Caddy: SPA + auto-HTTPS + API/WS reverse proxy) + api +
+Postgres + MinIO + nightly backups — in [`docker-compose.prod.yml`](docker-compose.prod.yml):
+```bash
+cp .env.example .env   # set DOMAIN, JWT_SECRET, POSTGRES_PASSWORD, S3 keys
+./scripts/deploy.sh    # git pull && docker compose -f docker-compose.prod.yml up -d --build
+```
+Full walkthrough (DNS, firewall, MinIO media, backups/restore): **[docs/DEPLOY.md](docs/DEPLOY.md)**.
+
+---
+
+**Status: all 15 modules across Phases 1–4 + the deployment phase are complete.**
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the module-by-module checklist.

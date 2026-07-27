@@ -16,6 +16,13 @@ export class ApiError extends Error {
   }
 }
 
+// P1 #9 — on any 401 (expired/invalid token), the client clears the token and
+// notifies the app so it can drop the session and send the user back to login.
+let unauthorizedHandler: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  unauthorizedHandler = fn;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const token = getToken();
@@ -28,6 +35,11 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const text = await res.text();
   const json = text ? JSON.parse(text) : null;
   if (!res.ok) {
+    // Expired/invalid session → clear it and notify the app (except on login).
+    if (res.status === 401 && !path.endsWith("/auth/login")) {
+      setToken(null);
+      unauthorizedHandler?.();
+    }
     throw new ApiError(res.status, (json && (json.message || json.error)) || res.statusText, json);
   }
   return json as T;
@@ -281,6 +293,127 @@ export interface MatchResponse {
   payoutCents: number | null;
   candidates: MatchCandidate[];
   ai: { model: string; version: string; confidence: number; needsHumanReview: boolean; decidedBy: string };
+}
+
+// ── Module 7 — load board ──
+export interface LoadPostRow {
+  id: string;
+  trackingId: string;
+  commodityType: string;
+  cargo: string | null;
+  origin: string | null;
+  dest: string | null;
+  targetPayoutCents: number | null;
+  minBidCents: number | null;
+  bidCount: number;
+  myBidCents: number | null;
+  notes: string | null;
+}
+export interface LoadBoardResponse {
+  needsSubscription: boolean;
+  subscription: { tier: string; status: string } | null;
+  posts: LoadPostRow[];
+}
+export interface LoadBidRow {
+  id: string;
+  amountCents: number;
+  status: string;
+  note: string | null;
+  carrier: { name: string; trust: number; safety: number | null; authorityActive: boolean } | null;
+}
+
+// ── Module 8 — onboarding ──
+export interface FmcsaPrefill {
+  legalName: string;
+  dba?: string;
+  authorityActive: boolean;
+  safetyScore?: number;
+  insuranceOnFile: boolean;
+}
+export interface PendingOnboarding {
+  carriers: Array<{ id: string; legalName: string; dotNumber: string | null; mcNumber: string | null; onboardingStatus: string; insuranceCount: number }>;
+  drivers: Array<{ id: string; name: string; type: string; onboardingStatus: string; backgroundCheckStatus: string | null }>;
+}
+
+// ── Module 9 — payments ──
+export interface PayoutRow {
+  id: string;
+  trackingId: string | null;
+  grossCents: number;
+  feeCents: number;
+  netCents: number;
+  method: string;
+  status: string;
+  quickPay: boolean;
+  settledAt: string | null;
+}
+
+// ── Module 12 — trust / monitoring ──
+export interface MonitoringCarrier {
+  id: string;
+  legalName: string;
+  dotNumber: string | null;
+  authorityActive: boolean;
+  insuranceValid: boolean;
+  safetyScore: number | null;
+  trustScore: number;
+  riskScore: number | null;
+  lastMonitoredAt: string | null;
+  alerts: string[];
+}
+export interface ClaimRow {
+  id: string;
+  trackingId: string | null;
+  status: string;
+  amountCents: number | null;
+  description: string;
+  createdAt: string;
+}
+
+// ── Module 13 — revenue admin ──
+export interface RevenueConfigResponse {
+  config: {
+    subFreePriceCents: number;
+    subProPriceCents: number;
+    subFleetPriceCents: number;
+    quickPayFeeBps: number;
+    loadBoardConnectionFeeCents: number;
+    escrowFeeBps: number;
+    valueAddPricing: unknown;
+  };
+  commodities: Array<{ type: string; label: string; enabled: boolean; marginBps: number }>;
+}
+export interface RevenueDashboard {
+  gmvCents: number;
+  streams: {
+    margin: number;
+    subscriptionMrr: number;
+    quickPayFees: number;
+    loadBoardConnectionFees: number;
+    escrowAssuranceFees: number;
+    valueAdd: number;
+  };
+  mrrCents: number;
+  transactionalRevenueCents: number;
+  blendedTakeRateBps: number;
+}
+
+// ── Module 14 — equipment / multi-commodity ──
+export interface EquipmentListingRow {
+  id: string;
+  title: string;
+  assetType: string;
+  description?: string | null;
+  dailyRateCents: number;
+  location?: string | null;
+}
+export interface MyLeaseRow {
+  id: string;
+  title: string;
+  rateCents: number;
+  status: string;
+  startAt: string | null;
+  endAt: string | null;
 }
 
 export function opsSocketUrl(): string {

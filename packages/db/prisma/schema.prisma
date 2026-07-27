@@ -9,7 +9,9 @@
 //  - Every AI output writes an AIDecision row (human-in-the-loop + QA hook).
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // native = local dev; linux-musl target = the Alpine-based production container.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -233,6 +235,13 @@ enum LeaseStatus {
   CANCELLED
 }
 
+enum OnboardingStatus {
+  PENDING
+  DOCS_SUBMITTED
+  VERIFIED
+  REJECTED
+}
+
 // ─────────────────────────────────────────────────────────────
 // Identity & RBAC
 // ─────────────────────────────────────────────────────────────
@@ -254,6 +263,9 @@ model User {
   approvals     AIDecision[] @relation("AIApprovedBy")
   qaReviews     QAReview[]   @relation("QAReviewer")
   ratingsGiven  Rating[]     @relation("RatingAuthor")
+  ownedCarriers Carrier[]    @relation("CarrierOwner")
+  bids          Bid[]        @relation("BidderUser")
+  ownedShipments Shipment[]  @relation("ShipmentOwner")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -307,14 +319,24 @@ model Carrier {
   authorityActive Boolean   @default(false)
   safetyScore   Int?        // 0..100, from carrier-monitoring (Phase 3)
   trustScore    Int         @default(50) // 0..100, reliability
+  onboardingStatus OnboardingStatus @default(PENDING)
+  fmcsaVerifiedAt DateTime?
+  // Carrier-monitoring (SEPARATE from GPS): compliance/fraud posture.
+  riskScore       Int?      // 0..100 double-broker / fraud risk (higher = riskier)
+  lastMonitoredAt DateTime?
   active        Boolean     @default(true)
+  // The user who operates this carrier (posts/bids on the load board as them).
+  ownerUserId   String?
+  owner         User?       @relation("CarrierOwner", fields: [ownerUserId], references: [id])
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  drivers    Driver[]
-  assets     Asset[]
-  legs       Leg[]
-  insurances Insurance[]
+  drivers       Driver[]
+  assets        Asset[]
+  legs          Leg[]
+  insurances    Insurance[]
+  bids          Bid[]
+  subscriptions Subscription[]
 }
 
 model Driver {
@@ -324,6 +346,9 @@ model Driver {
   phone       String?
   licenseNo   String?
   licenseState String?
+  licenseVerified Boolean @default(false)
+  backgroundCheckStatus String? // employees (W-2): pending|clear|flagged
+  onboardingStatus OnboardingStatus @default(PENDING)
   active      Boolean    @default(true)
   trustScore  Int        @default(50)
   lastLat     Float?
@@ -363,10 +388,48 @@ model AuctionPartner {
   code      AuctionPartnerCode @unique
   name      String
   enabled   Boolean            @default(true)
-  apiKey    String? // partner-scoped key for inbound API (hashed in prod)
+  // SHA-256 of the partner API key (the plaintext key is never stored).
+  apiKeyHash String?           @unique
   createdAt DateTime           @default(now())
 
-  lots AuctionLot[]
+  lots     AuctionLot[]
+  webhooks WebhookEndpoint[]
+}
+
+enum WebhookStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+// Partner-registered webhook endpoint (event push-back — "connected via API").
+model WebhookEndpoint {
+  id        String   @id @default(cuid())
+  partnerId String
+  partner   AuctionPartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  url       String
+  secret    String // HMAC signing secret
+  events    String[] // topics to deliver, e.g. ["shipment.status","shipment.booked"]
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  deliveries WebhookDelivery[]
+
+  @@index([partnerId])
+}
+
+model WebhookDelivery {
+  id           String        @id @default(cuid())
+  endpointId   String
+  endpoint     WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  event        String
+  payload      Json
+  status       WebhookStatus @default(PENDING)
+  responseCode Int?
+  attempts     Int           @default(0)
+  createdAt    DateTime      @default(now())
+
+  @@index([endpointId])
 }
 
 model AuctionLot {
@@ -431,6 +494,10 @@ model Shipment {
   auctionLotId String?     @unique
   auctionLot   AuctionLot? @relation(fields: [auctionLotId], references: [id])
 
+  // The customer/user who owns this shipment (object-level authorization).
+  ownerUserId String?
+  owner       User?   @relation("ShipmentOwner", fields: [ownerUserId], references: [id])
+
   // money — customer-facing only. Driver/carrier pay lives on Leg + Payment.
   // marginBps + payout are NEVER serialized to driver-scoped responses.
   quotedPriceCents Int?
@@ -454,9 +521,11 @@ model Shipment {
   escrow        EscrowTransaction?
   ratings       Rating[]
   claims        Claim[]
+  loadPost      LoadPost?
 
   @@index([status])
   @@index([commodityId])
+  @@index([ownerUserId])
 }
 
 model CargoItem {
@@ -669,6 +738,10 @@ model Payment {
   driverId   String?
   carrierId  String?
   quickPay   Boolean          @default(false)
+  memo       String? // e.g. "load_board_connection_fee", "quick_pay_fee"
+  externalRef String? // processor reference (Stripe/…); null for stub
+  // Idempotency key — a unique constraint prevents double-charging/paying.
+  idempotencyKey String?      @unique
   createdAt  DateTime         @default(now())
   settledAt  DateTime?
 
@@ -799,4 +872,109 @@ model Outbox {
   createdAt   DateTime  @default(now())
 
   @@index([publishedAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Load board & subscriptions (Module 7)
+// ─────────────────────────────────────────────────────────────
+
+enum LoadPostStatus {
+  OPEN
+  AWARDED
+  CANCELLED
+  EXPIRED
+}
+
+enum BidStatus {
+  PENDING
+  WON
+  LOST
+  WITHDRAWN
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+  FLEET
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  PAST_DUE
+}
+
+// An overflow shipment posted for vetted carriers to bid on.
+model LoadPost {
+  id               String         @id @default(cuid())
+  shipmentId       String         @unique
+  shipment         Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  postedByUserId   String?
+  status           LoadPostStatus @default(OPEN)
+  targetPayoutCents Int? // suggested payout shown to carriers (never the margin)
+  minBidCents      Int?
+  notes            String?
+  expiresAt        DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  bids Bid[]
+
+  @@index([status])
+}
+
+model Bid {
+  id            String    @id @default(cuid())
+  loadPostId    String
+  loadPost      LoadPost  @relation(fields: [loadPostId], references: [id], onDelete: Cascade)
+  carrierId     String?
+  carrier       Carrier?  @relation(fields: [carrierId], references: [id])
+  bidderUserId  String?
+  bidder        User?     @relation("BidderUser", fields: [bidderUserId], references: [id])
+  amountCents   Int
+  note          String?
+  status        BidStatus @default(PENDING)
+  createdAt     DateTime  @default(now())
+
+  @@index([loadPostId])
+  @@index([carrierId])
+}
+
+// Load-board access subscription (a revenue stream). One active per carrier.
+model Subscription {
+  id         String             @id @default(cuid())
+  carrierId  String
+  carrier    Carrier            @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  tier       SubscriptionTier   @default(FREE)
+  status     SubscriptionStatus @default(ACTIVE)
+  priceCents Int                @default(0)
+  startedAt  DateTime           @default(now())
+  renewsAt   DateTime?
+  createdAt  DateTime           @default(now())
+
+  @@index([carrierId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Revenue config — DB-backed levers for all six streams (admin
+// backboard, Module 13, builds its control panel on top of this).
+// Single-row table (id = "revenue").
+// ─────────────────────────────────────────────────────────────
+model RevenueConfig {
+  id                        String   @id @default("revenue")
+  // (1) margin % per commodity lives on Commodity.marginBps.
+  // (2) subscription tier prices
+  subFreePriceCents         Int      @default(0)
+  subProPriceCents          Int      @default(9900)
+  subFleetPriceCents        Int      @default(29900)
+  // (3) quick-pay fee %
+  quickPayFeeBps            Int      @default(150)
+  // (4) load-board connection fee (per awarded load)
+  loadBoardConnectionFeeCents Int    @default(4900)
+  // (5) payment / escrow assurance fee %
+  escrowFeeBps              Int      @default(100)
+  // (6) value-add pricing (flexible)
+  valueAddPricing           Json?
+  updatedAt                 DateTime @updatedAt @default(now())
 }

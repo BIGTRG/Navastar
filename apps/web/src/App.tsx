@@ -4,6 +4,7 @@ import {
   ApiError,
   setToken,
   getToken,
+  setUnauthorizedHandler,
   formatUSD,
   liveSocketUrl,
   type LoginResponse,
@@ -20,21 +21,39 @@ import { DriverApp } from "./components/DriverApp.js";
 import { OpsDashboard } from "./components/OpsDashboard.js";
 import { QAConsole } from "./components/QAConsole.js";
 import { DispatchBoard } from "./components/DispatchBoard.js";
+import { LoadBoard } from "./components/LoadBoard.js";
+import { Onboarding } from "./components/Onboarding.js";
+import { Payments } from "./components/Payments.js";
+import { Compliance } from "./components/Compliance.js";
+import { Monitoring } from "./components/Monitoring.js";
+import { Admin } from "./components/Admin.js";
+import { Equipment } from "./components/Equipment.js";
+import { ShipAnything } from "./components/ShipAnything.js";
+import { Copilot } from "./components/Copilot.js";
 
 // ─────────────────────────────────────────────────────────────
 // Root
 // ─────────────────────────────────────────────────────────────
 export function App() {
   const [user, setUser] = useState<LoginResponse["user"] | null>(null);
-  const [tab, setTab] = useState<"deliver" | "track" | "driver" | "ops" | "qa" | "dispatch">("deliver");
+  const [tab, setTab] = useState<
+    | "deliver" | "track" | "driver" | "ops" | "qa" | "dispatch" | "loadboard" | "onboarding" | "pay" | "compliance" | "risk" | "admin" | "equipment" | "copilot"
+  >("deliver");
 
   useEffect(() => {
+    // Any 401 from the API clears the session and returns to the login screen.
+    setUnauthorizedHandler(() => {
+      setToken(null);
+      setUser(null);
+      setTab("deliver");
+    });
     if (getToken()) {
       api.get<{ user: LoginResponse["user"] }>("/api/auth/me").then(
         (r) => setUser(r.user),
         () => setToken(null)
       );
     }
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   return (
@@ -80,15 +99,99 @@ export function App() {
                   QA
                 </TabButton>
               )}
+              {user.roles.some((r) => ["dispatcher", "qa_reviewer", "admin"].includes(r)) && (
+                <TabButton active={tab === "compliance"} onClick={() => setTab("compliance")}>
+                  Compliance
+                </TabButton>
+              )}
+              {user.roles.some((r) => ["dispatcher", "qa_reviewer", "admin"].includes(r)) && (
+                <TabButton active={tab === "risk"} onClick={() => setTab("risk")}>
+                  Trust &amp; Risk
+                </TabButton>
+              )}
+              {user.roles.includes("admin") && (
+                <TabButton active={tab === "admin"} onClick={() => setTab("admin")}>
+                  Revenue admin
+                </TabButton>
+              )}
+              {user.roles.some((r) =>
+                ["equipment_lessor", "independent_carrier", "lease_operator", "dispatcher", "admin"].includes(r)
+              ) && (
+                <TabButton active={tab === "equipment"} onClick={() => setTab("equipment")}>
+                  Equipment
+                </TabButton>
+              )}
+              {user.roles.some((r) =>
+                ["independent_carrier", "lease_operator", "dispatcher", "admin"].includes(r)
+              ) && (
+                <TabButton active={tab === "loadboard"} onClick={() => setTab("loadboard")}>
+                  Load board
+                </TabButton>
+              )}
+              {user.roles.some((r) =>
+                ["independent_carrier", "lease_operator", "employee_driver", "dispatcher", "admin"].includes(r)
+              ) && (
+                <TabButton active={tab === "onboarding"} onClick={() => setTab("onboarding")}>
+                  Onboarding
+                </TabButton>
+              )}
+              {user.roles.some((r) =>
+                ["independent_carrier", "lease_operator", "employee_driver", "dispatcher", "admin"].includes(r)
+              ) && (
+                <TabButton active={tab === "pay"} onClick={() => setTab("pay")}>
+                  Pay
+                </TabButton>
+              )}
+              <TabButton active={tab === "copilot"} onClick={() => setTab("copilot")}>
+                Copilot
+              </TabButton>
             </div>
-            {tab === "deliver" && <DeliverWizard />}
+            {tab === "deliver" && (
+              <>
+                <DeliverWizard />
+                <ShipAnything />
+              </>
+            )}
             {tab === "track" && (
               <TrackPanel canDispatch={user.roles.some((r) => r === "dispatcher" || r === "admin")} />
             )}
             {tab === "driver" && <DriverApp />}
             {tab === "ops" && <OpsDashboard />}
             {tab === "dispatch" && <DispatchBoard />}
+            {tab === "loadboard" && (
+              <LoadBoard
+                canPost={user.roles.some((r) => r === "dispatcher" || r === "admin")}
+                canBid={user.roles.some((r) => r === "independent_carrier" || r === "lease_operator" || r === "admin")}
+              />
+            )}
+            {tab === "onboarding" && (
+              <Onboarding
+                canSubmit={user.roles.some((r) =>
+                  ["independent_carrier", "lease_operator", "employee_driver", "dispatcher", "admin"].includes(r)
+                )}
+                canManage={user.roles.some((r) => r === "dispatcher" || r === "admin")}
+              />
+            )}
+            {tab === "pay" && (
+              <Payments
+                canViewOwn={user.roles.some((r) =>
+                  ["independent_carrier", "lease_operator", "employee_driver", "dispatcher", "admin"].includes(r)
+                )}
+                canSettle={user.roles.some((r) => r === "admin" || r === "dispatcher")}
+              />
+            )}
             {tab === "qa" && <QAConsole />}
+            {tab === "compliance" && <Compliance />}
+            {tab === "risk" && (
+              <Monitoring canManageClaims={user.roles.some((r) => r === "dispatcher" || r === "admin")} />
+            )}
+            {tab === "admin" && <Admin />}
+            {tab === "equipment" && (
+              <Equipment canManage={user.roles.some((r) => r === "equipment_lessor" || r === "admin")} />
+            )}
+            {tab === "copilot" && (
+              <Copilot canForecast={user.roles.some((r) => r === "dispatcher" || r === "admin")} />
+            )}
           </>
         )}
       </main>

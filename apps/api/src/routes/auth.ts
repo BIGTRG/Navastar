@@ -3,8 +3,8 @@ import { prisma } from "@navastar/db";
 import { loginRequest, verifyPassword, type AuthPrincipal } from "@navastar/shared";
 
 export default async function authRoutes(app: FastifyInstance) {
-  // POST /api/auth/login → { token, user }
-  app.post("/api/auth/login", async (req, reply) => {
+  // POST /api/auth/login → { token, user }. Tightly rate-limited (brute-force).
+  app.post("/api/auth/login", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (req, reply) => {
     const parsed = loginRequest.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "bad_request", issues: parsed.error.issues });

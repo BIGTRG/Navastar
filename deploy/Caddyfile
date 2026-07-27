@@ -1,0 +1,28 @@
+# Caddy: serves the SPA, auto-HTTPS for the domain, and reverse-proxies the API +
+# WebSocket. reverse_proxy passes Upgrade/Connection headers automatically, so
+# live tracking (/ws/*) works over wss. DOMAIN is injected from the environment;
+# defaults to localhost (Caddy issues an internal cert) for a local prod test.
+{$DOMAIN:localhost} {
+	encode zstd gzip
+
+	# API + WebSocket → the api service.
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+	handle /ws/* {
+		reverse_proxy api:4000
+	}
+
+	# Everything else → the SPA (client-side routing fallback).
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Optional: expose MinIO on a subdomain so browser presigned uploads/downloads
+# work in production. Then set S3_ENDPOINT + S3_PUBLIC_URL to https://minio.<domain>.
+# minio.{$DOMAIN} {
+# 	reverse_proxy minio:9000
+# }

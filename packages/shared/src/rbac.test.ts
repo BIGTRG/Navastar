@@ -1,6 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { Role } from "@navastar/db";
 import { hasPermission, canViewMargin, Permission } from "./rbac.js";
+import { hashApiKey } from "./auth.js";
+
+describe("hashApiKey", () => {
+  it("is deterministic and never returns the plaintext", () => {
+    const h = hashApiKey("demo-key-bidnow");
+    expect(h).toMatch(/^[0-9a-f]{64}$/);
+    expect(h).not.toContain("demo-key");
+    expect(hashApiKey("demo-key-bidnow")).toBe(h);
+    expect(hashApiKey("different")).not.toBe(h);
+  });
+});
 
 describe("RBAC", () => {
   it("customer can create quotes + book, but cannot see margin", () => {

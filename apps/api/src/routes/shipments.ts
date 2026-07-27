@@ -12,6 +12,7 @@ import {
 import { Permission } from "@navastar/shared";
 import { publishToOutbox } from "../events.js";
 import { serializeShipment } from "../lib/serialize.js";
+import { canAccessShipment } from "../lib/access.js";
 
 export default async function shipmentRoutes(app: FastifyInstance) {
   // POST /api/shipments/:id/book  { quoteId }
@@ -25,9 +26,17 @@ export default async function shipmentRoutes(app: FastifyInstance) {
 
       const shipment = await prisma.shipment.findUnique({
         where: { id },
-        include: { commodity: true },
+        include: { commodity: true, legs: { include: { driver: true, carrier: true } } },
       });
       if (!shipment) return reply.code(404).send({ error: "shipment_not_found" });
+
+      // Only the owning customer (or ops) may book this shipment (P0 #1).
+      const canBook = canAccessShipment(req.principal, {
+        ownerUserId: shipment.ownerUserId,
+        driverUserIds: shipment.legs.map((l) => l.driver?.userId).filter((x): x is string => !!x),
+        carrierOwnerUserIds: shipment.legs.map((l) => l.carrier?.ownerUserId).filter((x): x is string => !!x),
+      });
+      if (!canBook) return reply.code(403).send({ error: "forbidden" });
 
       const quote = await prisma.quote.findUnique({ where: { id: body.quoteId } });
       if (!quote || quote.shipmentId !== shipment.id) {
@@ -94,9 +103,18 @@ export default async function shipmentRoutes(app: FastifyInstance) {
           auctionLot: { include: { partner: true } },
           quotes: { orderBy: { createdAt: "desc" }, take: 5 },
           custodyEvents: { orderBy: { sequence: "asc" } },
+          legs: { include: { driver: true, carrier: true } },
         },
       });
       if (!shipment) return reply.code(404).send({ error: "shipment_not_found" });
+
+      // Object-level authorization (P0 #1): owner / assigned driver / carrier / ops.
+      const ok = canAccessShipment(req.principal, {
+        ownerUserId: shipment.ownerUserId,
+        driverUserIds: shipment.legs.map((l) => l.driver?.userId).filter((x): x is string => !!x),
+        carrierOwnerUserIds: shipment.legs.map((l) => l.carrier?.ownerUserId).filter((x): x is string => !!x),
+      });
+      if (!ok) return reply.code(403).send({ error: "forbidden" });
 
       const roles = req.principal?.roles ?? [];
       return {

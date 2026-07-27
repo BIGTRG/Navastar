@@ -1,6 +1,7 @@
 // Navastar demo seed. Idempotent-ish: upserts stable rows by natural keys.
 // Run: pnpm db:seed  (after `pnpm db:push` or `pnpm db:migrate`)
 import bcrypt from "bcryptjs";
+import { createHash } from "node:crypto";
 import {
   prisma,
   Role,
@@ -10,6 +11,8 @@ import {
   CarrierKind,
   DriverType,
   AssetType,
+  SubscriptionTier,
+  SubscriptionStatus,
 } from "../src/index.js";
 
 const DEMO_PASSWORD = "password123"; // demo only — see docs/BRIEF for prod auth
@@ -64,14 +67,16 @@ async function main() {
     { code: AuctionPartnerCode.MANHEIM, name: "Manheim" },
     { code: AuctionPartnerCode.ADESA, name: "ADESA" },
   ];
+  // Demo partner API keys are `demo-key-<code>`; only their SHA-256 hash is stored.
+  const apiKeyHash = (code: string) => createHash("sha256").update(`demo-key-${code.toLowerCase()}`).digest("hex");
   for (const p of partners) {
     await prisma.auctionPartner.upsert({
       where: { code: p.code },
-      update: { name: p.name },
-      create: { ...p, apiKey: `demo-key-${p.code.toLowerCase()}` },
+      update: { name: p.name, apiKeyHash: apiKeyHash(p.code) },
+      create: { ...p, apiKeyHash: apiKeyHash(p.code) },
     });
   }
-  console.log(`  ✓ ${partners.length} auction partners`);
+  console.log(`  ✓ ${partners.length} auction partners (demo key: demo-key-<code>)`);
 
   // ── Users, one per role ──
   const users: Array<{ email: string; name: string; roles: Role[] }> = [
@@ -99,7 +104,7 @@ async function main() {
   // ── A carrier with drivers + assets ──
   const carrier = await prisma.carrier.upsert({
     where: { dotNumber: "1234567" },
-    update: {},
+    update: { ownerUserId: userByEmail["carrier@demo.navastar"] },
     create: {
       kind: CarrierKind.INDEPENDENT,
       legalName: "Roadrunner Transport LLC",
@@ -109,8 +114,19 @@ async function main() {
       authorityActive: true,
       safetyScore: 88,
       trustScore: 82,
+      ownerUserId: userByEmail["carrier@demo.navastar"],
     },
   });
+
+  // Give the demo carrier an active PRO subscription so it can use the load board.
+  if ((await prisma.subscription.count({ where: { carrierId: carrier.id } })) === 0) {
+    await prisma.subscription.create({
+      data: { carrierId: carrier.id, tier: SubscriptionTier.PRO, status: SubscriptionStatus.ACTIVE, priceCents: 9900 },
+    });
+  }
+
+  // Single-row revenue config (all six streams; admin backboard edits this later).
+  await prisma.revenueConfig.upsert({ where: { id: "revenue" }, update: {}, create: { id: "revenue" } });
 
   const employeeDriver = await prisma.driver.upsert({
     where: { userId: userByEmail["driver@demo.navastar"] },

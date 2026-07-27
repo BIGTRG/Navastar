@@ -26,6 +26,29 @@ export const Permission = {
   // ops / dispatch
   OPS_DASHBOARD_READ: "ops_dashboard:read",
   DISPATCH_ASSIGN: "dispatch:assign",
+  // load board
+  LOAD_BOARD_VIEW: "load_board:view",
+  LOAD_BID: "load:bid",
+  LOAD_POST: "load:post",
+  // onboarding
+  ONBOARD_SUBMIT: "onboarding:submit",
+  ONBOARD_MANAGE: "onboarding:manage",
+  // payments
+  PAYMENTS_VIEW: "payments:view",
+  PAYOUT_VIEW_OWN: "payout:view_own",
+  PAYMENTS_SETTLE: "payments:settle",
+  // compliance / custody
+  COMPLIANCE_VIEW: "compliance:view",
+  // trust / insurance / monitoring
+  RATING_SUBMIT: "rating:submit",
+  CLAIM_FILE: "claim:file",
+  CLAIM_MANAGE: "claim:manage",
+  INSURANCE_MANAGE: "insurance:manage",
+  MONITORING_VIEW: "monitoring:view",
+  // multi-commodity + equipment marketplace
+  SHIPMENT_CREATE: "shipment:create",
+  EQUIPMENT_MANAGE: "equipment:manage",
+  EQUIPMENT_LEASE: "equipment:lease",
   // qa
   QA_REVIEW: "qa:review",
   // admin / revenue
@@ -47,6 +70,10 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.SHIPMENT_BOOK,
     P.SHIPMENT_READ_OWN,
     P.SHIPMENT_TRACK,
+    P.RATING_SUBMIT,
+    P.CLAIM_FILE,
+    P.SHIPMENT_CREATE,
+    P.EQUIPMENT_LEASE,
   ],
   [Role.auction_partner]: [P.AUCTION_LOT_CREATE, P.QUOTE_CREATE, P.SHIPMENT_BOOK, P.SHIPMENT_TRACK],
   [Role.independent_carrier]: [
@@ -55,6 +82,11 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.POD_SUBMIT,
     P.MEDIA_UPLOAD,
     P.SHIPMENT_TRACK,
+    P.LOAD_BOARD_VIEW,
+    P.LOAD_BID,
+    P.ONBOARD_SUBMIT,
+    P.PAYOUT_VIEW_OWN,
+    P.EQUIPMENT_LEASE,
   ],
   [Role.employee_driver]: [
     P.DRIVER_JOBS_READ,
@@ -62,6 +94,8 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.POD_SUBMIT,
     P.MEDIA_UPLOAD,
     P.SHIPMENT_TRACK,
+    P.ONBOARD_SUBMIT,
+    P.PAYOUT_VIEW_OWN,
   ],
   [Role.lease_operator]: [
     P.DRIVER_JOBS_READ,
@@ -69,6 +103,11 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.POD_SUBMIT,
     P.MEDIA_UPLOAD,
     P.SHIPMENT_TRACK,
+    P.LOAD_BOARD_VIEW,
+    P.LOAD_BID,
+    P.ONBOARD_SUBMIT,
+    P.PAYOUT_VIEW_OWN,
+    P.EQUIPMENT_LEASE,
   ],
   [Role.dispatcher]: [
     P.SHIPMENT_READ_ALL,
@@ -81,9 +120,23 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.MEDIA_UPLOAD,
     P.INSPECTION_SUBMIT,
     P.POD_SUBMIT,
+    P.LOAD_BOARD_VIEW,
+    P.LOAD_POST,
+    P.ONBOARD_SUBMIT,
+    P.ONBOARD_MANAGE,
+    P.PAYMENTS_VIEW,
+    P.PAYMENTS_SETTLE,
+    P.COMPLIANCE_VIEW,
+    P.RATING_SUBMIT,
+    P.CLAIM_FILE,
+    P.CLAIM_MANAGE,
+    P.INSURANCE_MANAGE,
+    P.MONITORING_VIEW,
+    P.SHIPMENT_CREATE,
+    P.EQUIPMENT_LEASE,
   ],
-  [Role.qa_reviewer]: [P.QA_REVIEW, P.SHIPMENT_READ_ALL, P.SHIPMENT_TRACK],
-  [Role.equipment_lessor]: [P.SHIPMENT_TRACK],
+  [Role.qa_reviewer]: [P.QA_REVIEW, P.SHIPMENT_READ_ALL, P.SHIPMENT_TRACK, P.COMPLIANCE_VIEW, P.MONITORING_VIEW],
+  [Role.equipment_lessor]: [P.SHIPMENT_TRACK, P.EQUIPMENT_MANAGE, P.EQUIPMENT_LEASE],
   [Role.admin]: [P.ADMIN_ALL], // expanded to all permissions by hasPermission()
 };
 
