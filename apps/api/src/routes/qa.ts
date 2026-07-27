@@ -5,6 +5,7 @@
 // AIDecision, and feed driver/carrier reliability (trust) scores. This closes the
 // "AI does it → a human approves → QA verifies" loop.
 import type { FastifyInstance } from "fastify";
+import { idParams } from "../lib/validation.js";
 import { z } from "zod";
 import { prisma, QAStatus, verifyCustodyChain, DocumentType } from "@navastar/db";
 import { Permission } from "@navastar/shared";
@@ -56,7 +57,7 @@ export default async function qaRoutes(app: FastifyInstance) {
 
   // Full review context: findings + custody (verified) + POD/photos + AI envelope.
   app.get("/api/qa/inspections/:id", guard, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const inspection = await prisma.inspection.findUnique({
       where: { id },
       include: {
@@ -126,7 +127,7 @@ export default async function qaRoutes(app: FastifyInstance) {
 
   // Pass / Fix / Fail. Writes a QAReview, sets qaStatus, feeds reliability scores.
   app.post("/api/qa/inspections/:id/decision", guard, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const body = z.object({ status: z.enum(["pass", "fix", "fail"]), note: z.string().optional() }).safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: "bad_request", issues: body.error.issues });
 

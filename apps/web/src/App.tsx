@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { StubBadge } from "./components/StubBadge.js";
 import {
   api,
   ApiError,
@@ -688,6 +689,7 @@ function AiBadge({ ai }: { ai: QuoteResponse["ai"] }) {
       <span className="rounded-full bg-slate-200 px-2 py-0.5 font-medium text-slate-700">
         AI · {ai.model}@{ai.version}
       </span>
+      <StubBadge model={ai.model} version={ai.version} />
       <span
         className={`rounded-full px-2 py-0.5 font-medium ${
           pct >= 75 ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"

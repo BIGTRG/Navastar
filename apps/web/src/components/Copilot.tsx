@@ -2,6 +2,7 @@
 // a demand/revenue forecast panel for ops.
 import { useEffect, useState } from "react";
 import { api, ApiError, formatUSD } from "../api.js";
+import { StubBadge, isStubModel } from "./StubBadge.js";
 
 const input = "flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm";
 const primary = "rounded-lg bg-navy-600 px-3 py-2 text-sm font-medium text-white hover:bg-navy-700 disabled:opacity-50";
@@ -45,7 +46,7 @@ function SupportChat() {
         {
           role: "ai",
           text: res.answer,
-          meta: `${res.ai.model} · ${Math.round(res.ai.confidence * 100)}%${res.ai.needsHumanReview ? " · a human agent can take over" : ""}`,
+          meta: `${res.ai.model} · ${Math.round(res.ai.confidence * 100)}%${isStubModel(res.ai.model) ? " · stub estimate" : ""}${res.ai.needsHumanReview ? " · a human agent can take over" : ""}`,
         },
       ]);
     } catch (e) {
@@ -88,7 +89,10 @@ function ForecastPanel() {
   if (!f) return null;
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold">Demand forecast</h2>
+      <div className="flex items-center gap-2">
+        <h2 className="text-lg font-semibold">Demand forecast</h2>
+        <StubBadge model={f.model} />
+      </div>
       <p className="mt-1 text-sm text-slate-500">
         Trailing 30d: {f.history.bookings} bookings ({f.history.avgPerDay}/day). Model {f.model} · {Math.round(f.confidence * 100)}% confidence.
       </p>

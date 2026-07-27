@@ -4,6 +4,8 @@
 // weekly settlement. Booking auto-collects the fee + opens escrow via events, but
 // an explicit init-escrow endpoint is provided for demoing pre-booked shipments.
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
+import { idParams, idSchema } from "../lib/validation.js";
 import { prisma, PaymentDirection } from "@navastar/db";
 import { Permission } from "@navastar/shared";
 import { initEscrowForShipment, quickPay, settleWeekly } from "../lib/payments.js";
@@ -14,7 +16,7 @@ export default async function paymentRoutes(app: FastifyInstance) {
     "/api/payments/shipments/:id",
     { preHandler: [app.requirePermission(Permission.PAYMENTS_VIEW)] },
     async (req, reply) => {
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });
       if (!shipment) return reply.code(404).send({ error: "shipment_not_found" });
       const [payments, escrow] = await Promise.all([
@@ -45,7 +47,7 @@ export default async function paymentRoutes(app: FastifyInstance) {
     "/api/payments/shipments/:id/init-escrow",
     { preHandler: [app.requirePermission(Permission.PAYMENTS_VIEW)] },
     async (req, reply) => {
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });
       if (!shipment) return reply.code(404).send({ error: "shipment_not_found" });
       await initEscrowForShipment(shipment.id);
@@ -94,7 +96,7 @@ export default async function paymentRoutes(app: FastifyInstance) {
     "/api/payments/:paymentId/quickpay",
     { preHandler: [app.requirePermission(Permission.PAYOUT_VIEW_OWN)] },
     async (req, reply) => {
-      const { paymentId } = req.params as { paymentId: string };
+      const { paymentId } = z.object({ paymentId: idSchema }).parse(req.params);
       const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
       if (!payment) return reply.code(404).send({ error: "payment_not_found" });
 

@@ -4,6 +4,7 @@
 // a Leg with the driver's payout (driver never sees margin), advances the shipment
 // to ASSIGNED with a hash-chained custody event, and emits live + outbox events.
 import type { FastifyInstance } from "fastify";
+import { idParams } from "../lib/validation.js";
 import { z } from "zod";
 import {
   prisma,
@@ -43,7 +44,7 @@ export default async function dispatchRoutes(app: FastifyInstance) {
 
   // Run the matching engine (logged as an AI MATCHING decision).
   app.post("/api/dispatch/shipments/:id/match", guard, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });
     if (!shipment) return reply.code(404).send({ error: "shipment_not_found" });
 
@@ -73,7 +74,7 @@ export default async function dispatchRoutes(app: FastifyInstance) {
 
   // Assign a driver — auto (best eligible) or a specified driverId.
   app.post("/api/dispatch/shipments/:id/assign", guard, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const body = z.object({ driverId: z.string().optional(), mode: z.enum(["auto", "manual"]).optional() }).parse(req.body ?? {});
     const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });
     if (!shipment) return reply.code(404).send({ error: "shipment_not_found" });

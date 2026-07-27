@@ -2,6 +2,7 @@
 // simulator + reading recent track history, plus a WebSocket endpoint that streams
 // live `tracking.point` / `shipment.status` events for one shipment.
 import type { FastifyInstance } from "fastify";
+import { idParams } from "../lib/validation.js";
 import { prisma } from "@navastar/db";
 import { Permission, type AuthPrincipal } from "@navastar/shared";
 import { z } from "zod";
@@ -27,7 +28,7 @@ export default async function trackingRoutes(app: FastifyInstance) {
     "/api/shipments/:id/tracking",
     { preHandler: [app.requirePermission(Permission.SHIPMENT_TRACK)] },
     async (req, reply) => {
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const parsed = pingBody.safeParse(req.body);
       if (!parsed.success) return reply.code(400).send({ error: "bad_request", issues: parsed.error.issues });
       const point = await recordTrackingPoint(id, parsed.data);
@@ -37,7 +38,7 @@ export default async function trackingRoutes(app: FastifyInstance) {
 
   // Recent track history + current position (initial map state before WS events).
   app.get("/api/shipments/:id/track", { preHandler: [app.authenticate] }, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const shipment = await prisma.shipment.findFirst({
       where: { OR: [{ id }, { trackingId: id }] },
       include: { pickup: true, dropoff: true, legs: { include: { driver: true, carrier: true } } },
@@ -78,7 +79,7 @@ export default async function trackingRoutes(app: FastifyInstance) {
     { preHandler: [app.requirePermission(Permission.DISPATCH_ASSIGN)] },
     async (req, reply) => {
       if (!demoEnabled()) return reply.code(403).send({ error: "demo_disabled", message: "Simulators are disabled in production." });
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const parsed = simBody.safeParse(req.body);
       if (!parsed.success) return reply.code(400).send({ error: "bad_request", issues: parsed.error.issues });
       const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });
@@ -92,7 +93,7 @@ export default async function trackingRoutes(app: FastifyInstance) {
     "/api/shipments/:id/simulate/stop",
     { preHandler: [app.requirePermission(Permission.DISPATCH_ASSIGN)] },
     async (req, reply) => {
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });
       if (!shipment) return reply.code(404).send({ error: "shipment_not_found" });
       return { shipmentId: shipment.id, stopped: stopSimulation(shipment.id) };
@@ -101,7 +102,7 @@ export default async function trackingRoutes(app: FastifyInstance) {
 
   // WebSocket live stream: /ws/shipments/:id?token=JWT
   app.get("/ws/shipments/:id", { websocket: true }, (socket, req) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const token = (req.query as { token?: string }).token;
     let principal: AuthPrincipal | null = null;
     try {

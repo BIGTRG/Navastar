@@ -2,6 +2,7 @@
 // commodity margin (server-side only), moves the shipment to BOOKED, and returns
 // the tracking id. Reads strip margin for anyone without margin:view.
 import type { FastifyInstance } from "fastify";
+import { idParams } from "../lib/validation.js";
 import {
   prisma,
   appendCustodyEvent,
@@ -20,7 +21,7 @@ export default async function shipmentRoutes(app: FastifyInstance) {
     "/api/shipments/:id/book",
     { preHandler: [app.requirePermission(Permission.SHIPMENT_BOOK)] },
     async (req, reply) => {
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const body = (req.body ?? {}) as { quoteId?: string };
       if (!body.quoteId) return reply.code(400).send({ error: "bad_request", message: "quoteId is required." });
 
@@ -92,7 +93,7 @@ export default async function shipmentRoutes(app: FastifyInstance) {
     "/api/shipments/:id",
     { preHandler: [app.authenticate] },
     async (req, reply) => {
-      const { id } = req.params as { id: string };
+      const { id } = idParams.parse(req.params);
       const shipment = await prisma.shipment.findFirst({
         where: { OR: [{ id }, { trackingId: id }] },
         include: {

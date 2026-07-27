@@ -2,6 +2,7 @@
 // custody log (tamper-evidence + export for audit) and runs the commodity rules
 // engine against a shipment.
 import type { FastifyInstance } from "fastify";
+import { idParams } from "../lib/validation.js";
 import { prisma, verifyCustodyChain, AssetType } from "@navastar/db";
 import { Permission } from "@navastar/shared";
 import { evaluateRules, ruleCatalog } from "../lib/compliance.js";
@@ -14,7 +15,7 @@ export default async function complianceRoutes(app: FastifyInstance) {
 
   // Run the commodity rules engine against a shipment.
   app.get("/api/compliance/shipments/:id/check", guard, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const shipment = await prisma.shipment.findFirst({
       where: { OR: [{ id }, { trackingId: id }] },
       include: {
@@ -42,7 +43,7 @@ export default async function complianceRoutes(app: FastifyInstance) {
 
   // Verify the custody chain (tamper-evidence).
   app.get("/api/custody/shipments/:id/verify", guard, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });
     if (!shipment) return reply.code(404).send({ error: "shipment_not_found" });
     const chain = await verifyCustodyChain(shipment.id);
@@ -51,7 +52,7 @@ export default async function complianceRoutes(app: FastifyInstance) {
 
   // Export the full custody chain (evidence: sequence, type, actor, hashes).
   app.get("/api/custody/shipments/:id/export", guard, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = idParams.parse(req.params);
     const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });
     if (!shipment) return reply.code(404).send({ error: "shipment_not_found" });
     const [events, chain] = await Promise.all([

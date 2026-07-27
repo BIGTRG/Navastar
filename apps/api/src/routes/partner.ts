@@ -3,6 +3,7 @@
 // serves the embeddable "Deliver with Navastar" widget script (public). These
 // endpoints are the surface documented by OpenAPI at /api/docs.
 import type { FastifyInstance } from "fastify";
+import { idSchema } from "../lib/validation.js";
 import { z } from "zod";
 import {
   prisma,
@@ -104,7 +105,7 @@ export default async function partnerRoutes(app: FastifyInstance) {
 
   // Track a shipment (partner-scoped, read-only subset).
   app.get("/api/partner/shipments/:trackingId", { ...auth, schema: { tags: ["partner"], summary: "Track a shipment" } }, async (req, reply) => {
-    const { trackingId } = req.params as { trackingId: string };
+    const { trackingId } = z.object({ trackingId: idSchema }).parse(req.params);
     const shipment = await prisma.shipment.findFirst({
       where: { trackingId, auctionLot: { partnerId: req.partner!.id } },
       include: { custodyEvents: { orderBy: { sequence: "asc" } } },

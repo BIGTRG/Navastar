@@ -51,9 +51,11 @@ async function main() {
     { commodity: CommodityType.WHITE_GLOVE, name: "White-Glove Delivery", requiresLiftgate: true },
     { commodity: CommodityType.LIVE_ANIMALS, name: "Livestock (disabled)", liveCargo: true },
   ];
-  // profiles have no natural unique key; seed only if empty
-  if ((await prisma.handlingProfile.count()) === 0) {
-    await prisma.handlingProfile.createMany({ data: profiles });
+  // No DB-level unique key on (commodity, name); make idempotent per item so a
+  // partial re-seed can't duplicate rows (natural key: commodity + name).
+  for (const p of profiles) {
+    const existing = await prisma.handlingProfile.findFirst({ where: { commodity: p.commodity, name: p.name } });
+    if (!existing) await prisma.handlingProfile.create({ data: p });
   }
   console.log(`  ✓ handling profiles`);
 
@@ -145,12 +147,15 @@ async function main() {
     },
   });
 
-  if ((await prisma.driver.count()) < 2) {
+  // Second demo driver (independent). Natural key: phone — a global count()<2
+  // guard could double-insert after a partial seed, so key on the driver instead.
+  const rioPhone = "+1-555-0202";
+  if (!(await prisma.driver.findFirst({ where: { phone: rioPhone } }))) {
     await prisma.driver.create({
       data: {
         type: DriverType.INDEPENDENT,
         name: "Rio Contractor",
-        phone: "+1-555-0202",
+        phone: rioPhone,
         carrierId: carrier.id,
         trustScore: 78,
         lastLat: 33.4484,
@@ -160,13 +165,15 @@ async function main() {
     });
   }
 
-  if ((await prisma.asset.count()) === 0) {
-    await prisma.asset.createMany({
-      data: [
-        { type: AssetType.CAR_HAULER, label: "9-car open hauler", plate: "TX-CAR9", capacity: 9, carrierId: carrier.id },
-        { type: AssetType.ENCLOSED, label: "2-car enclosed", plate: "TX-ENC2", capacity: 2, carrierId: carrier.id },
-      ],
-    });
+  // Assets — natural key: plate. Idempotent per item so a partial re-seed can't
+  // duplicate haulers (the old global count()===0 guard could).
+  const assets = [
+    { type: AssetType.CAR_HAULER, label: "9-car open hauler", plate: "TX-CAR9", capacity: 9, carrierId: carrier.id },
+    { type: AssetType.ENCLOSED, label: "2-car enclosed", plate: "TX-ENC2", capacity: 2, carrierId: carrier.id },
+  ];
+  for (const a of assets) {
+    const existing = a.plate ? await prisma.asset.findFirst({ where: { plate: a.plate } }) : null;
+    if (!existing) await prisma.asset.create({ data: a });
   }
   console.log(`  ✓ carrier + drivers + assets`);
 

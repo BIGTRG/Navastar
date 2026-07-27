@@ -10,6 +10,7 @@ import {
   type QaDetail,
   type QaReliabilityRow,
 } from "../api.js";
+import { StubBadge } from "./StubBadge.js";
 
 const primary = "rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-50";
 const secondary = "rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50";
@@ -144,6 +145,7 @@ function ReviewDetail({ item, onDone }: { item: QaQueueItem; onDone: () => void 
                 <Pill className="bg-slate-100 text-slate-600">
                   AI {detail.ai.model}@{detail.ai.version}
                 </Pill>
+                <StubBadge model={detail.ai.model} version={detail.ai.version} />
                 <Pill className={detail.ai.confidence >= 0.75 ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}>
                   {Math.round(detail.ai.confidence * 100)}% confidence
                 </Pill>
