@@ -253,7 +253,14 @@ export async function settleWeekly() {
     if (escrow?.externalRef && escrow.state === EscrowState.RELEASED) {
       try {
         const paid = await getEscrowConnector().markPaid(escrow.externalRef);
-        await prisma.escrowTransaction.update({ where: { shipmentId: p.shipmentId }, data: { state: paid.state } });
+        await prisma.escrowTransaction.update({
+          where: { shipmentId: p.shipmentId },
+          data: {
+            state: paid.state,
+            lastActorType: "system",
+            lastTransitionAt: new Date(),
+          },
+        });
       } catch {
         /* ignore */
       }
