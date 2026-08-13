@@ -90,6 +90,7 @@ services:
     ports:
       - "8800:8800"
     volumes:
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile
       - caddydata:/data
       - caddyconfig:/config
 
