@@ -9,8 +9,10 @@ import {
   ShipmentStatus,
   CommodityType,
   DriverType,
+  CustodyEventType,
   Prisma,
 } from "@navastar/db";
+import { advanceStatus } from "../lib/tracking.js";
 import { Permission, splitRate, type AuthPrincipal } from "@navastar/shared";
 import { serializeShipment } from "../lib/serialize.js";
 import { hub, OPS_ROOM } from "../realtime.js";
@@ -164,6 +166,67 @@ export default async function opsRoutes(app: FastifyInstance) {
       }))
       .filter((d) => (q.kind && q.kind !== "all" ? d.kind === q.kind : true));
     return { drivers: rows };
+  });
+
+  // Fleet-map endpoint: driver positions + their current active job (via Leg) + ETA.
+  app.get("/api/ops/fleet-map", guard, async () => {
+    const drivers = await prisma.driver.findMany({
+      where: { active: true },
+      include: {
+        carrier: { select: { legalName: true } },
+        legs: {
+          where: { shipment: { status: { in: ACTIVE } } },
+          include: { shipment: { include: { pickup: true, dropoff: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+    const roaming = new Set(roamingIds());
+    return {
+      drivers: drivers.map((d) => {
+        const leg = d.legs[0] ?? null;
+        const job = leg?.shipment ?? null;
+        return {
+          id: d.id,
+          name: d.name,
+          kind: d.type === DriverType.EMPLOYEE_W2 ? "fleet" : "contractor",
+          carrier: d.carrier?.legalName ?? "Navastar Fleet",
+          lat: d.lastLat,
+          lng: d.lastLng,
+          lastSeenAt: d.lastSeenAt,
+          roaming: roaming.has(d.id),
+          currentJob: job
+            ? {
+                trackingId: job.trackingId,
+                status: job.status,
+                origin: job.pickup?.city ?? "—",
+                dest: job.dropoff?.city ?? "—",
+                etaAt: job.etaAt?.toISOString() ?? null,
+              }
+            : undefined,
+        };
+      }),
+    };
+  });
+
+  // Ops resolve a shipment EXCEPTION: moves it back to IN_TRANSIT + appends event.
+  app.post("/api/ops/exceptions/:id/resolve", { preHandler: [app.requirePermission(Permission.DISPATCH_ASSIGN)] }, async (req, reply) => {
+    const { id } = idParams.parse(req.params);
+    const body = z.object({ note: z.string().optional() }).safeParse(req.body);
+    const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });
+    if (!shipment) return reply.code(404).send({ error: "shipment_not_found" });
+    if (shipment.status !== ShipmentStatus.EXCEPTION)
+      return reply.code(409).send({ error: "not_exception", status: shipment.status });
+    const updated = await advanceStatus(
+      shipment.id,
+      ShipmentStatus.IN_TRANSIT,
+      CustodyEventType.HANDOFF,
+      { type: "user", id: req.principal?.userId },
+      { note: body.data?.note ?? "Exception resolved by ops" }
+    );
+    return { shipmentId: updated.id, status: updated.status, resolvedBy: req.principal?.userId };
   });
 
   // Demo: animate a driver on the map.

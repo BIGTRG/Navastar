@@ -51,6 +51,8 @@ export const Permission = {
   EQUIPMENT_LEASE: "equipment:lease",
   // qa
   QA_REVIEW: "qa:review",
+  // escrow / delivery approval
+  DELIVERY_APPROVE: "delivery:approve",
   // admin / revenue
   ADMIN_ALL: "admin:all",
   REVENUE_CONFIG: "revenue:config",
@@ -113,6 +115,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     P.SHIPMENT_READ_ALL,
     P.OPS_DASHBOARD_READ,
     P.DISPATCH_ASSIGN,
+    P.DELIVERY_APPROVE,
     P.SHIPMENT_TRACK,
     P.MARGIN_VIEW,
     P.QUOTE_CREATE,

@@ -3,7 +3,9 @@
 // commodity, (2) subscription tier prices, (3) quick-pay fee %, (4) load-board
 // connection fee, (5) payment/escrow assurance fee %, (6) value-add pricing. Plus
 // commodity on/off toggles (Live Animals ships OFF until flipped on). Live
-// dashboard: GMV, revenue by stream, MRR, blended take rate.
+// dashboard: GMV, revenue by stream, MRR, blended take rate, monthly & annual totals.
+// B-track additions: GET /api/admin/commodities, PUT /api/admin/revenue/config,
+// GET /api/admin/revenue/dashboard now returns monthly + annual projections.
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
@@ -49,6 +51,40 @@ export default async function adminRoutes(app: FastifyInstance) {
     };
   });
 
+  // GET full commodity list (standalone — used by commodity grid & feature-flag checks).
+  app.get("/api/admin/commodities", guard, async () => {
+    const commodities = await prisma.commodity.findMany({ orderBy: { label: "asc" } });
+    return {
+      commodities: commodities.map((c) => ({
+        type: c.type,
+        label: c.label,
+        enabled: c.enabled,
+        marginBps: c.marginBps,
+      })),
+    };
+  });
+
+  // PUT /api/admin/revenue/config — full replace of revenue levers (idempotent).
+  app.put("/api/admin/revenue/config", guard, async (req, reply) => {
+    const body = z
+      .object({
+        subFreePriceCents: z.number().int().min(0).optional(),
+        subProPriceCents: z.number().int().min(0).optional(),
+        subFleetPriceCents: z.number().int().min(0).optional(),
+        quickPayFeeBps: z.number().int().min(0).max(10000).optional(),
+        loadBoardConnectionFeeCents: z.number().int().min(0).optional(),
+        escrowFeeBps: z.number().int().min(0).max(10000).optional(),
+        valueAddPricing: z.record(z.unknown()).optional(),
+      })
+      .safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: "bad_request", issues: body.error.issues });
+    const updated = await prisma.revenueConfig.update({
+      where: { id: "revenue" },
+      data: { ...body.data, valueAddPricing: body.data.valueAddPricing as Prisma.InputJsonValue | undefined },
+    });
+    return { ok: true, updatedAt: updated.updatedAt };
+  });
+
   // Update revenue levers (partial).
   app.patch("/api/admin/revenue/config", guard, async (req, reply) => {
     const body = z
@@ -80,7 +116,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     return { type: c.type, enabled: c.enabled, marginBps: c.marginBps };
   });
 
-  // Live revenue dashboard: GMV, revenue by stream, MRR, blended take rate.
+  // Live revenue dashboard: GMV, revenue by stream, MRR, blended take rate, monthly + annual.
   app.get("/api/admin/revenue/dashboard", guard, async () => {
     const [moneyShipments, payments, activeSubs] = await Promise.all([
       prisma.shipment.findMany({
@@ -107,6 +143,11 @@ export default async function adminRoutes(app: FastifyInstance) {
     // Transactional revenue (excludes recurring MRR) for the blended take rate.
     const transactionalRevenueCents = marginCents + quickPayFeeCents + connectionFeeCents + escrowFeeCents;
 
+    // Monthly revenue = MRR + transactional revenue (current cumulative as proxy for MTD).
+    const monthlyRevenueCents = mrrCents + transactionalRevenueCents;
+    // Annual projection = monthly × 12.
+    const annualRevenueCents = monthlyRevenueCents * 12;
+
     return {
       gmvCents,
       streams: {
@@ -120,6 +161,8 @@ export default async function adminRoutes(app: FastifyInstance) {
       mrrCents,
       transactionalRevenueCents,
       blendedTakeRateBps: gmvCents > 0 ? Math.round((transactionalRevenueCents / gmvCents) * 10000) : 0,
+      monthlyRevenueCents,
+      annualRevenueCents,
     };
   });
 }

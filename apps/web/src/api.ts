@@ -396,6 +396,9 @@ export interface RevenueDashboard {
   mrrCents: number;
   transactionalRevenueCents: number;
   blendedTakeRateBps: number;
+  /** B-track: monthly revenue (MRR + transactional) and annual projection */
+  monthlyRevenueCents?: number;
+  annualRevenueCents?: number;
 }
 
 // ── Module 14 — equipment / multi-commodity ──

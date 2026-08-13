@@ -749,17 +749,21 @@ model Payment {
 }
 
 model EscrowTransaction {
-  id         String      @id @default(cuid())
-  shipmentId String      @unique
-  shipment   Shipment    @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-  state      EscrowState @default(FEE_COLLECTED)
-  provider   String      @default("stub")
-  feeCents   Int         @default(0) // assurance fee (both sides, configurable)
-  heldCents  Int         @default(0)
-  releasedCents Int      @default(0)
-  externalRef String?
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id              String      @id @default(cuid())
+  shipmentId      String      @unique
+  shipment        Shipment    @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  state           EscrowState @default(FEE_COLLECTED)
+  provider        String      @default("stub")
+  feeCents        Int         @default(0) // assurance fee (both sides, configurable)
+  heldCents       Int         @default(0)
+  releasedCents   Int         @default(0)
+  externalRef     String?
+  // Audit: who triggered the last state transition and when.
+  lastActorId     String?     // userId of the dispatcher/system that fired the transition
+  lastActorType   String?     // "system" | "ai" | "driver" | "user"
+  lastTransitionAt DateTime?  // explicit timestamp of the last state change
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -8,7 +8,7 @@ import { z } from "zod";
 import { idParams, idSchema } from "../lib/validation.js";
 import { prisma, PaymentDirection } from "@navastar/db";
 import { Permission } from "@navastar/shared";
-import { initEscrowForShipment, quickPay, settleWeekly } from "../lib/payments.js";
+import { initEscrowForShipment, quickPay, quickPayForShipment, settleWeekly } from "../lib/payments.js";
 
 export default async function paymentRoutes(app: FastifyInstance) {
   // Ops: full money view for a shipment (inbound charge, payouts, escrow state).
@@ -109,6 +109,25 @@ export default async function paymentRoutes(app: FastifyInstance) {
 
       try {
         const res = await quickPay(paymentId);
+        return res;
+      } catch (e) {
+        const status = (e as { statusCode?: number }).statusCode ?? 500;
+        return reply.code(status).send({ error: (e as Error).message });
+      }
+    }
+  );
+
+  // Driver/carrier or ops: instant quick-pay for a shipment's pending payout.
+  // Fee is configurable (quickPayFeeBps in RevenueConfig, default 150bps = 1.5%).
+  // Available to both outside carriers AND internal drivers.
+  app.post(
+    "/api/payments/quick-pay/:shipmentId",
+    { preHandler: [app.requirePermission(Permission.PAYOUT_VIEW_OWN)] },
+    async (req, reply) => {
+      const { shipmentId } = z.object({ shipmentId: idSchema }).parse(req.params);
+      const userId = req.principal?.userId;
+      try {
+        const res = await quickPayForShipment(shipmentId, userId);
         return res;
       } catch (e) {
         const status = (e as { statusCode?: number }).statusCode ?? 500;

@@ -69,8 +69,13 @@ export async function initEscrowForShipment(shipmentId: string) {
   });
 }
 
-/** POD/BOL sign-off → release escrow and create the (weekly-free) payout. */
-export async function releaseEscrowForShipment(shipmentId: string) {
+/** POD/BOL sign-off → release escrow and create the (weekly-free) payout.
+ *  actorId / actorType are recorded on the EscrowTransaction for audit.
+ */
+export async function releaseEscrowForShipment(
+  shipmentId: string,
+  actor?: { actorId?: string | null; actorType?: string }
+) {
   const escrow = await prisma.escrowTransaction.findUnique({ where: { shipmentId } });
   if (!escrow || escrow.state !== EscrowState.FUNDS_HELD) return;
 
@@ -83,10 +88,18 @@ export async function releaseEscrowForShipment(shipmentId: string) {
     orderBy: { sequence: "desc" },
   });
 
+  const now = new Date();
   await prisma.$transaction(async (tx) => {
     await tx.escrowTransaction.update({
       where: { shipmentId },
-      data: { state: released.state, releasedCents: escrow.heldCents },
+      data: {
+        state: released.state,
+        releasedCents: escrow.heldCents,
+        // Persist actor + timestamp for the state transition audit.
+        lastActorId: actor?.actorId ?? null,
+        lastActorType: actor?.actorType ?? "system",
+        lastTransitionAt: now,
+      },
     });
     if (leg?.payoutCents != null) {
       // Standard payout: PENDING, settled free on the weekly run.
@@ -125,37 +138,105 @@ export async function quickPay(paymentId: string) {
   }
   const cfg = await revenueConfig();
   const fee = feeOf(payment.amountCents, cfg.quickPayFeeBps);
+  const netCents = payment.amountCents - fee;
 
   // Instant payout through the processor (idempotent per payment).
+  // Uses Stripe instant payout method (same-day) if the processor supports it.
   const po = await getPaymentProcessor().payout({
-    amountCents: payment.amountCents - fee,
+    amountCents: netCents,
     memo: "carrier_payout_quickpay",
     idempotencyKey: `payout-instant:${paymentId}`,
+    instant: true, // Stripe: method='instant', requires debit card on file
   });
 
-  const updated = await prisma.payment.update({
-    where: { id: paymentId },
-    data: {
-      method: PaymentMethod.QUICK_PAY,
-      quickPay: true,
-      feeCents: fee,
-      status: PaymentStatus.SETTLED,
-      settledAt: new Date(),
-      memo: "carrier_payout_quickpay",
-      externalRef: po.externalRef,
-    },
+  // Log the quick-pay fee as a separate inbound revenue record.
+  const updated = await prisma.$transaction(async (tx) => {
+    const p = await tx.payment.update({
+      where: { id: paymentId },
+      data: {
+        method: PaymentMethod.QUICK_PAY,
+        quickPay: true,
+        feeCents: fee,
+        status: PaymentStatus.SETTLED,
+        settledAt: new Date(),
+        memo: "carrier_payout_quickpay",
+        externalRef: po.externalRef,
+      },
+    });
+    // Record the fee as Navastar revenue (INBOUND, same shipment).
+    if (fee > 0) {
+      await tx.payment.create({
+        data: {
+          shipmentId: payment.shipmentId,
+          direction: PaymentDirection.INBOUND,
+          method: PaymentMethod.QUICK_PAY,
+          status: PaymentStatus.CAPTURED,
+          amountCents: fee,
+          feeCents: 0,
+          memo: "quick_pay_fee_revenue",
+          idempotencyKey: `qp-fee:${paymentId}`,
+        },
+      });
+    }
+    return p;
   });
+
   // Mark escrow PAID (best-effort; escrow may already be RELEASED).
   const escrow = await prisma.escrowTransaction.findUnique({ where: { shipmentId: payment.shipmentId } });
   if (escrow?.externalRef && escrow.state === EscrowState.RELEASED) {
     try {
       const paid = await getEscrowConnector().markPaid(escrow.externalRef);
-      await prisma.escrowTransaction.update({ where: { shipmentId: payment.shipmentId }, data: { state: paid.state } });
+      await prisma.escrowTransaction.update({
+        where: { shipmentId: payment.shipmentId },
+        data: {
+          state: paid.state,
+          lastActorType: "system",
+          lastTransitionAt: new Date(),
+        },
+      });
     } catch {
       /* escrow already advanced */
     }
   }
-  return { paymentId: updated.id, feeCents: fee, netCents: updated.amountCents - fee, settledAt: updated.settledAt };
+
+  bus.emitEvent({
+    topic: "payment.quickpay_settled",
+    payload: { paymentId: updated.id, shipmentId: payment.shipmentId, feeCents: fee, netCents, externalRef: po.externalRef },
+    id: `${paymentId}:quickpay`,
+    at: new Date().toISOString(),
+  });
+
+  return { paymentId: updated.id, feeCents: fee, netCents, settledAt: updated.settledAt };
+}
+
+/**
+ * Quick-pay by shipmentId: finds the latest PENDING PAYOUT for the shipment
+ * and triggers instant pay. Used by the POST /api/payments/quick-pay/:shipmentId route.
+ */
+export async function quickPayForShipment(shipmentId: string, requestorUserId?: string) {
+  const shipment = await prisma.shipment.findUnique({ where: { id: shipmentId } });
+  if (!shipment) throw Object.assign(new Error("shipment_not_found"), { statusCode: 404 });
+
+  // Find the most recent pending PAYOUT for this shipment.
+  const payment = await prisma.payment.findFirst({
+    where: { shipmentId, direction: PaymentDirection.PAYOUT, status: PaymentStatus.PENDING },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!payment) throw Object.assign(new Error("no_pending_payout"), { statusCode: 409 });
+
+  // Ownership check: only the payout owner (or an ops user with no driver/carrier)
+  // may trigger quick-pay via this route. Callers should enforce permissions first.
+  if (requestorUserId) {
+    const driver = await prisma.driver.findUnique({ where: { userId: requestorUserId } });
+    const carrier = await prisma.carrier.findFirst({ where: { ownerUserId: requestorUserId } });
+    const owns =
+      (!driver && !carrier) || // ops user — allowed
+      (payment.driverId && payment.driverId === driver?.id) ||
+      (payment.carrierId && payment.carrierId === carrier?.id);
+    if (!owns) throw Object.assign(new Error("not_your_payout"), { statusCode: 403 });
+  }
+
+  return quickPay(payment.id);
 }
 
 /** The free weekly settlement run: settle all PENDING (non-quick-pay) payouts. */
@@ -193,7 +274,11 @@ export function initPayments() {
     );
   });
   bus.on("pod.signed", (e: { payload: Record<string, unknown> }) => {
-    void releaseEscrowForShipment(e.payload.shipmentId as string).catch((err) =>
+    const actor = {
+      actorId: e.payload.approvedByUserId as string | undefined ?? null,
+      actorType: e.payload.dispatcherApproved ? "user" : (e.payload.autoApproved ? "ai" : "system"),
+    };
+    void releaseEscrowForShipment(e.payload.shipmentId as string, actor).catch((err) =>
       console.error("[payments] releaseEscrow error:", err)
     );
   });

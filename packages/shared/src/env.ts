@@ -44,6 +44,8 @@ const schema = z.object({
   // Payment processor (charges + payouts). Real vendor plugs in via env.
   PAYMENT_PROVIDER: z.enum(["stub", "stripe"]).default("stub"),
   STRIPE_SECRET_KEY: z.string().optional().default(""),
+  // Stripe webhook signing secret (whsec_…). Required for the Stripe webhook endpoint.
+  STRIPE_WEBHOOK_SECRET: z.string().optional().default(""),
   EVENT_BUS: z.enum(["inprocess", "kafka"]).default("inprocess"),
   FMCSA_WEBKEY: z.string().optional().default(""),
 });

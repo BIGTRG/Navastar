@@ -7,7 +7,7 @@ import type { FleetDriver } from "../api.js";
 
 const COLORS = { fleet: "#2563eb", contractor: "#dc2626" } as const;
 
-export function FleetMap({ drivers }: { drivers: FleetDriver[] }) {
+export function FleetMap({ drivers, onDriverClick }: { drivers: FleetDriver[]; onDriverClick?: (d: FleetDriver) => void }) {
   const elRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<Map<string, L.CircleMarker>>(new Map());
@@ -44,6 +44,7 @@ export function FleetMap({ drivers }: { drivers: FleetDriver[] }) {
         marker = L.circleMarker([d.lat, d.lng], { radius: 8, color, fillColor: color, fillOpacity: 0.85, weight: 2 })
           .bindTooltip(`${d.name} · ${d.kind}`, { direction: "top" })
           .addTo(map);
+        if (onDriverClick) marker.on("click", () => onDriverClick(d));
         markersRef.current.set(d.id, marker);
       } else {
         marker.setLatLng([d.lat, d.lng]);

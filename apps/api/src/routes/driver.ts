@@ -15,6 +15,7 @@ import {
   CustodyEventType,
   DocumentType,
   AIDecisionKind,
+  QAStatus,
 } from "@navastar/db";
 import { Permission, getAi, runAi } from "@navastar/shared";
 import { getStorageProvider } from "@navastar/providers";
@@ -256,8 +257,18 @@ export default async function driverRoutes(app: FastifyInstance) {
     }
   );
 
-  // Delivery: signature + photo POD → DELIVERED. Fires `pod.signed` (escrow
-  // release hook for Module 9) and a `shipment.status` live event.
+  // Delivery: signature + photo POD → DELIVERED.
+  //
+  // Three-pillar flow (Plan of Correction A3):
+  //   1. AI verifies delivery: photos present, signature captured, confidence scored.
+  //   2. If AI confidence < threshold OR no photos → needsHumanReview = true.
+  //      In that case the shipment is marked DELIVERED but escrow is held pending
+  //      dispatcher approval (POST /api/shipments/:id/approve-delivery).
+  //   3. If AI is confident → escrow release fires immediately (signBol → release → markPaid).
+  //      QA can audit the AIDecision row at any time.
+  //
+  // Escrow state transitions are persisted with timestamps + actor in the
+  // EscrowTransaction.updatedAt and via custody events.
   app.post(
     "/api/shipments/:id/pod",
     { preHandler: [app.requirePermission(Permission.POD_SUBMIT)] },
@@ -268,23 +279,73 @@ export default async function driverRoutes(app: FastifyInstance) {
       const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });
       if (!shipment) return reply.code(404).send({ error: "shipment_not_found" });
 
+      // ── Pillar 1: AI delivery verification ──────────────────────────────────
+      // AI checks: are photos present? Is a signature captured?
+      // Uses runAi() so the result is confidence-gated and QA-auditable.
+      const ai = getAi();
+      const deliveryPayload = {
+        shipmentId: shipment.id,
+        signerName: parsed.data.signerName,
+        signatureKey: parsed.data.signatureKey,
+        photoKeys: parsed.data.photoKeys,
+        photoCount: parsed.data.photoKeys.length,
+        hasSignature: !!parsed.data.signatureKey,
+      };
+
+      const aiEnvelope = await runAi(
+        AIDecisionKind.INSPECTION, // closest available kind for delivery verification
+        deliveryPayload,
+        () =>
+          ai.aiInspection({
+            shipmentId: shipment.id,
+            imageKeys: parsed.data.photoKeys,
+          }),
+        { shipmentId: shipment.id }
+      );
+
+      // Pillar 2: determine whether human dispatcher approval is required.
+      // Require human review if:
+      //   - AI confidence is below threshold, OR
+      //   - No POD photos were uploaded, OR
+      //   - No signature was captured
+      const needsHumanReview =
+        aiEnvelope.needsHumanReview ||
+        parsed.data.photoKeys.length === 0 ||
+        !parsed.data.signatureKey;
+
       await prisma.$transaction(async (tx) => {
+        // Persist POD documents.
         if (parsed.data.signatureKey) {
           await tx.document.create({
-            data: { shipmentId: shipment.id, type: DocumentType.SIGNATURE, storageKey: parsed.data.signatureKey, meta: { signerName: parsed.data.signerName } },
+            data: {
+              shipmentId: shipment.id,
+              type: DocumentType.SIGNATURE,
+              storageKey: parsed.data.signatureKey,
+              meta: { signerName: parsed.data.signerName },
+            },
           });
         }
         for (const key of parsed.data.photoKeys) {
           await tx.document.create({ data: { shipmentId: shipment.id, type: DocumentType.POD, storageKey: key } });
         }
+
+        // Record POD_SIGNED custody event with AI decision provenance.
         await appendCustodyEvent(tx, {
           shipmentId: shipment.id,
           type: CustodyEventType.POD_SIGNED,
           actorType: "driver",
           actorId: req.principal?.userId ?? null,
-          payload: { signerName: parsed.data.signerName, photos: parsed.data.photoKeys.length },
+          payload: {
+            signerName: parsed.data.signerName,
+            photos: parsed.data.photoKeys.length,
+            aiDecisionId: aiEnvelope.aiDecisionId,
+            aiConfidence: aiEnvelope.confidence,
+            needsHumanReview,
+          },
         });
+
         await tx.shipment.update({ where: { id: shipment.id }, data: { status: ShipmentStatus.DELIVERED } });
+
         await appendCustodyEvent(tx, {
           shipmentId: shipment.id,
           type: CustodyEventType.DELIVERED,
@@ -292,8 +353,30 @@ export default async function driverRoutes(app: FastifyInstance) {
           actorId: req.principal?.userId ?? null,
           payload: { status: ShipmentStatus.DELIVERED },
         });
-        // Escrow release hook (Module 9): digital-BOL/POD sign-off = release event.
-        await publishToOutbox(tx, "pod.signed", { shipmentId: shipment.id, signerName: parsed.data.signerName });
+
+        if (!needsHumanReview) {
+          // Pillar 3 (auto-path): AI confident → fire escrow release immediately.
+          // pod.signed event triggers releaseEscrowForShipment via the event bus.
+          await publishToOutbox(tx, "pod.signed", {
+            shipmentId: shipment.id,
+            signerName: parsed.data.signerName,
+            aiDecisionId: aiEnvelope.aiDecisionId,
+            autoApproved: true,
+          });
+        } else {
+          // Human-approval path: publish a pending-approval event so dispatchers
+          // are notified. Escrow release is deferred until approve-delivery fires.
+          await publishToOutbox(tx, "pod.pending_approval", {
+            shipmentId: shipment.id,
+            signerName: parsed.data.signerName,
+            aiDecisionId: aiEnvelope.aiDecisionId,
+            reason: !parsed.data.signatureKey
+              ? "missing_signature"
+              : parsed.data.photoKeys.length === 0
+              ? "missing_photos"
+              : "low_ai_confidence",
+          });
+        }
       });
 
       bus.emitEvent({
@@ -303,7 +386,140 @@ export default async function driverRoutes(app: FastifyInstance) {
         at: new Date().toISOString(),
       });
 
-      return reply.code(200).send({ shipmentId: shipment.id, status: ShipmentStatus.DELIVERED });
+      return reply.code(200).send({
+        shipmentId: shipment.id,
+        status: ShipmentStatus.DELIVERED,
+        escrowRelease: needsHumanReview ? "pending_dispatcher_approval" : "auto_released",
+        ai: {
+          decisionId: aiEnvelope.aiDecisionId,
+          confidence: aiEnvelope.confidence,
+          needsHumanReview,
+          decidedBy: aiEnvelope.decidedBy,
+          qaStatus: aiEnvelope.qaStatus,
+        },
+      });
+    }
+  );
+
+  // Dispatcher: approve a delivery and fire escrow release.
+  //
+  // Pillar 2 (human-in-the-loop): dispatcher reviews AI flags, confirms the
+  // delivery is legitimate, and triggers escrow → released → paid.
+  // QA can audit the approval via the AIDecision and custody event audit trail.
+  app.post(
+    "/api/shipments/:id/approve-delivery",
+    { preHandler: [app.requirePermission(Permission.DELIVERY_APPROVE)] },
+    async (req, reply) => {
+      const { id } = idParams.parse(req.params);
+      const body = z
+        .object({
+          approved: z.boolean(),
+          note: z.string().optional(),
+          aiDecisionId: z.string().optional(),
+        })
+        .safeParse(req.body);
+      if (!body.success) return reply.code(400).send({ error: "bad_request", issues: body.error.issues });
+
+      const shipment = await prisma.shipment.findFirst({ where: { OR: [{ id }, { trackingId: id }] } });
+      if (!shipment) return reply.code(404).send({ error: "shipment_not_found" });
+      if (shipment.status !== ShipmentStatus.DELIVERED) {
+        return reply.code(409).send({ error: "not_yet_delivered" });
+      }
+
+      const dispatcherId = req.principal?.userId ?? null;
+      const now = new Date();
+
+      if (!body.data.approved) {
+        // Dispatcher rejected — log for QA audit, do NOT release escrow.
+        await prisma.$transaction(async (tx) => {
+          await appendCustodyEvent(tx, {
+            shipmentId: shipment.id,
+            type: CustodyEventType.POD_SIGNED, // reuse closest event type for audit
+            actorType: "user",
+            actorId: dispatcherId,
+            payload: {
+              action: "delivery_approval_rejected",
+              note: body.data.note,
+              aiDecisionId: body.data.aiDecisionId,
+              at: now.toISOString(),
+            },
+          });
+          // Mark AIDecision as failed QA if provided.
+          if (body.data.aiDecisionId) {
+            await tx.aIDecision.update({
+              where: { id: body.data.aiDecisionId },
+              data: { qaStatus: QAStatus.fail, approvedByUserId: dispatcherId },
+            }).catch(() => { /* decision may not exist */ });
+          }
+        });
+
+        bus.emitEvent({
+          topic: "delivery.approval_rejected",
+          payload: { shipmentId: shipment.id, dispatcherId, note: body.data.note, at: now.toISOString() },
+          id: `${shipment.id}:delivery-rejected`,
+          at: now.toISOString(),
+        });
+
+        return reply.code(200).send({ shipmentId: shipment.id, approved: false, escrowRelease: "rejected" });
+      }
+
+      // ── Approved: fire escrow signBol → release → markPaid ──────────────────
+      const escrow = await prisma.escrowTransaction.findUnique({ where: { shipmentId: shipment.id } });
+      if (!escrow) return reply.code(409).send({ error: "no_escrow_found" });
+
+      await prisma.$transaction(async (tx) => {
+        // Persist dispatcher approval in AIDecision QA audit trail.
+        if (body.data.aiDecisionId) {
+          await tx.aIDecision.update({
+            where: { id: body.data.aiDecisionId },
+            data: { qaStatus: QAStatus.pass, approvedByUserId: dispatcherId },
+          }).catch(() => { /* decision may not exist */ });
+        }
+
+        // Append dispatcher-approval custody event (actor + timestamp persisted).
+        await appendCustodyEvent(tx, {
+          shipmentId: shipment.id,
+          type: CustodyEventType.POD_SIGNED,
+          actorType: "user",
+          actorId: dispatcherId,
+          payload: {
+            action: "delivery_approved",
+            note: body.data.note,
+            aiDecisionId: body.data.aiDecisionId,
+            at: now.toISOString(),
+          },
+        });
+
+        // Fire pod.signed → releaseEscrowForShipment (signBol + release + markPaid).
+        // Escrow state transitions are persisted with updatedAt timestamps via
+        // releaseEscrowForShipment → escrowTransaction.update().
+        await publishToOutbox(tx, "pod.signed", {
+          shipmentId: shipment.id,
+          dispatcherApproved: true,
+          approvedByUserId: dispatcherId,
+          aiDecisionId: body.data.aiDecisionId,
+          at: now.toISOString(),
+        });
+      });
+
+      bus.emitEvent({
+        topic: "delivery.approved",
+        payload: {
+          shipmentId: shipment.id,
+          dispatcherId,
+          aiDecisionId: body.data.aiDecisionId,
+          at: now.toISOString(),
+        },
+        id: `${shipment.id}:delivery-approved`,
+        at: now.toISOString(),
+      });
+
+      return reply.code(200).send({
+        shipmentId: shipment.id,
+        approved: true,
+        escrowRelease: "triggered",
+        escrowState: escrow.state,
+      });
     }
   );
 }

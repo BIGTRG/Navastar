@@ -31,6 +31,7 @@ import adminRoutes from "./routes/admin.js";
 import shippingRoutes from "./routes/shipping.js";
 import equipmentRoutes from "./routes/equipment.js";
 import aiRoutes from "./routes/ai.js";
+import stripeWebhookRoutes from "./routes/stripe-webhook.js";
 import { hub } from "./realtime.js";
 import { initPayments } from "./lib/payments.js";
 import { initWebhooks } from "./lib/webhooks.js";
@@ -100,6 +101,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(onboardingRoutes);
   // Module 9 — payments, settlement & escrow.
   await app.register(paymentRoutes);
+  // Module 9 — Stripe webhook receiver (raw body; must register BEFORE the JSON body parser catches it).
+  await app.register(stripeWebhookRoutes);
   // Module 10 — public/partner API + webhooks + widget.
   await app.register(partnerRoutes);
   // Module 11 — custody & compliance (rules engine + chain verify/export).
